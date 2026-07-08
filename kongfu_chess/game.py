@@ -11,13 +11,16 @@ parallel when their routes do not conflict. The board updates only when
 ``handle_wait`` completes a move. After arrival there is no cooldown yet
 (future iteration can hook into ``_execute_move``).
 
+Capturing the enemy king on move completion ends the game; subsequent
+``handle_click`` calls are ignored. ``handle_wait`` is unchanged.
+
 ``movement_rules`` and ``move_durations`` are constructor parameters
 (defaulting to the standard rule-set), the same pattern Board already uses
 for ``valid_colors``/``valid_piece_types`` - a future "design your own game"
 feature can hand Game custom instances without any change here.
 """
 
-from .config import CELL_SIZE_PX, DEFAULT_MOVE_DURATION_MS
+from .config import CELL_SIZE_PX, DEFAULT_MOVE_DURATION_MS, KING_PIECE_TYPE
 from .movement import (
     MovementRules,
     get_move_route,
@@ -37,10 +40,16 @@ class Game:
         self._selected = None  # None, or a (row, col) tuple
         self._active_moves = []
         self._next_order = 0
+        self._game_over = False
+
+    @property
+    def is_game_over(self):
+        return self._game_over
 
     def handle_click(self, pixel_x, pixel_y):
         """Handle a click at the given pixel coordinates.
 
+        - Ignored entirely once the game is over.
         - Clicking outside the board is ignored.
         - A piece whose origin is currently in-flight cannot be selected.
         - Clicking a piece with nothing selected selects it (if not moving).
@@ -50,6 +59,9 @@ class Game:
         - Otherwise, a move is attempted: if legal and route-conflict-free,
           it is queued as in-flight; the selection is cleared either way.
         """
+        if self._game_over:
+            return
+
         row, col = self._pixel_to_cell(pixel_x, pixel_y)
         if not self._board.in_bounds(row, col):
             return
@@ -160,7 +172,17 @@ class Game:
     def _execute_move(self, move):
         from_row, from_col = move["from"]
         to_row, to_col = move["to"]
+        captured = self._board.get_cell(to_row, to_col)
         self._board.move_piece(from_row, from_col, to_row, to_col)
+        if self._is_enemy_king_capture(captured, move["color"]):
+            self._game_over = True
+
+    def _is_enemy_king_capture(self, captured_piece, moving_color):
+        return (
+            captured_piece is not None
+            and captured_piece.piece_type == KING_PIECE_TYPE
+            and captured_piece.color != moving_color
+        )
 
     def _remove_active_move(self, move):
         while move in self._active_moves:

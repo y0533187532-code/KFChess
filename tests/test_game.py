@@ -410,3 +410,37 @@ def test_pawn_cannot_capture_forward_without_diagonal():
     game.handle_click(50, 50)    # try to capture bN directly forward - illegal
     assert board.get_cell(1, 0).token == "wP"  # never moved
     assert board.get_cell(0, 0).token == "bN"  # never captured
+
+
+# --- Game over (iteration 9) ---
+
+def test_capturing_enemy_king_ends_the_game():
+    board, game = make_game([["wR", "bK"]])
+    game.handle_click(50, 50)    # select wR at (0, 0)
+    game.handle_click(150, 50)   # capture bK at (0, 1)
+    assert not game.is_game_over
+    finish_move(game)
+    assert game.is_game_over
+    assert board.get_cell(0, 1).token == "wR"
+
+
+def test_clicks_are_ignored_after_game_over():
+    board, game = make_game([["wR", "bK"], [".", "wN"]])
+    game.handle_click(50, 50)    # select wR, capture bK
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert game.is_game_over
+    snapshot = board.render_rows()
+    game.handle_click(150, 250)  # try to select wN at (1, 1)
+    game.handle_click(250, 250)  # try to move
+    assert board.render_rows() == snapshot
+    assert game.is_game_over
+
+
+def test_game_is_not_over_when_capturing_non_king():
+    board, game = make_game([["wR", "bQ"]])
+    game.handle_click(50, 50)
+    game.handle_click(150, 50)   # capture bQ
+    finish_move(game)
+    assert not game.is_game_over
+    assert board.get_cell(0, 1).token == "wR"
