@@ -22,6 +22,7 @@ feature can hand Game custom instances without any change here.
 
 from .config import (
     CELL_SIZE_PX,
+    DEFAULT_JUMP_DURATION_MS,
     DEFAULT_MOVE_DURATION_MS,
     KING_PIECE_TYPE,
     PAWN_PIECE_TYPE,
@@ -38,11 +39,22 @@ from .movement import (
 
 
 class Game:
-    def __init__(self, board, movement_rules=None, move_durations=None):
+    def __init__(
+        self,
+        board,
+        movement_rules=None,
+        move_durations=None,
+        jump_duration_ms=None,
+    ):
         self._board = board
         self._movement_rules = movement_rules or MovementRules()
         self._move_durations = dict(
             move_durations if move_durations is not None else DEFAULT_MOVE_DURATION_MS
+        )
+        self._jump_duration_ms = (
+            jump_duration_ms
+            if jump_duration_ms is not None
+            else DEFAULT_JUMP_DURATION_MS
         )
         self._selected = None  # None, or a (row, col) tuple
         self._active_moves = []
@@ -86,6 +98,13 @@ class Game:
             self._selected = None
             return
 
+        if (row, col) == (from_row, from_col):
+            if clicked_piece is None:
+                self._selected = None
+            else:
+                self._attempt_jump(from_row, from_col)
+            return
+
         if clicked_piece is not None and clicked_piece.color == self._selected_piece.color:
             if (row, col) in moving_origins:
                 self._selected = None
@@ -97,9 +116,10 @@ class Game:
     def handle_wait(self, milliseconds):
         """Advance the game clock by ``milliseconds``.
 
-        Ticks down every in-flight move; those that finish are executed in
-        order of (remaining before tick, queue order). Swap partners that
-        lose the race are cancelled without landing.
+        Ticks down every in-flight move; those that finish are processed in
+        groups by (remaining before tick, queue order). Swap partners that
+        lose the race are cancelled without landing. Airborne jumps may
+        capture enemy pieces that arrive at their cell during the jump.
         """
         finished = []
 
@@ -112,23 +132,75 @@ class Game:
         finished.sort(key=lambda item: (item["finish_time"], item["move"]["order"]))
 
         completed = []
-        for entry in finished:
-            move = entry["move"]
-            if move not in self._active_moves:
-                continue
+        index = 0
+        while index < len(finished):
+            finish_time = finished[index]["finish_time"]
+            group_end = index
+            while (
+                group_end < len(finished)
+                and finished[group_end]["finish_time"] == finish_time
+            ):
+                group_end += 1
 
-            if not self._can_execute_move(move, completed):
+            group = finished[index:group_end]
+            group_moves = [entry["move"] for entry in group]
+            airborne_jumps = [
+                jump_move
+                for jump_move in self._active_moves
+                if jump_move.get("jump")
+                and (jump_move in group_moves or jump_move["remaining"] > 0)
+            ]
+
+            for entry in group:
+                move = entry["move"]
+                if move not in self._active_moves or move.get("jump"):
+                    continue
+                if self._is_captured_by_airborne_jump(move, airborne_jumps):
+                    from_row, from_col = move["from"]
+                    self._board.clear_cell(from_row, from_col)
+                    self._remove_active_move(move)
+                    completed.append(move)
+
+            for entry in group:
+                move = entry["move"]
+                if move not in self._active_moves:
+                    continue
+
+                if move.get("jump"):
+                    self._remove_active_move(move)
+                    completed.append(move)
+                    continue
+
+                if not self._can_execute_move(move, completed):
+                    self._remove_active_move(move)
+                    continue
+
+                self._execute_move(move)
                 self._remove_active_move(move)
-                continue
+                completed.append(move)
 
-            self._execute_move(move)
-            self._remove_active_move(move)
-            completed.append(move)
+            index = group_end
 
     @property
     def _selected_piece(self):
         row, col = self._selected
         return self._board.get_cell(row, col)
+
+    def _attempt_jump(self, from_row, from_col):
+        piece = self._selected_piece
+        self._active_moves.append(
+            {
+                "from": (from_row, from_col),
+                "to": (from_row, from_col),
+                "remaining": self._jump_duration_ms,
+                "order": self._next_order,
+                "route": [],
+                "color": piece.color,
+                "jump": True,
+            }
+        )
+        self._next_order += 1
+        self._selected = None
 
     def _attempt_move_to(self, row, col):
         from_row, from_col = self._selected
@@ -168,6 +240,7 @@ class Game:
                 new_route,
                 existing["color"],
                 piece.color,
+                existing_jump=existing.get("jump", False),
             ):
                 self._selected = None
                 return
@@ -202,6 +275,14 @@ class Game:
         )
         if self._is_enemy_king_capture(captured, move["color"]):
             self._game_over = True
+
+    def _is_captured_by_airborne_jump(self, move, airborne_jumps):
+        to_row, to_col = move["to"]
+        return any(
+            jump_move["from"] == (to_row, to_col)
+            and jump_move["color"] != move["color"]
+            for jump_move in airborne_jumps
+        )
 
     def _is_enemy_king_capture(self, captured_piece, moving_color):
         return (

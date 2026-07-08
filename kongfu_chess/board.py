@@ -64,6 +64,11 @@ class Board:
     def get_cell(self, row, col):
         """Return the Piece at (row, col), or None if the cell is empty."""
         return self._cells[row][col]
+
+    def clear_cell(self, row, col):
+        """Remove whatever occupies (row, col), leaving the cell empty."""
+        self._cells[row][col] = None
+
     def in_bounds(self, row, col):
         """Return True if (row, col) is a real cell on this board.
 

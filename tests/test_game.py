@@ -1,5 +1,5 @@
 from kongfu_chess.board import Board
-from kongfu_chess.config import DEFAULT_MOVE_DURATION_MS
+from kongfu_chess.config import DEFAULT_JUMP_DURATION_MS, DEFAULT_MOVE_DURATION_MS
 from kongfu_chess.game import Game
 
 FULL_MOVE_WAIT_MS = DEFAULT_MOVE_DURATION_MS["K"]
@@ -487,3 +487,69 @@ def test_game_is_not_over_when_capturing_non_king():
     finish_move(game)
     assert not game.is_game_over
     assert board.get_cell(0, 1).token == "wR"
+
+
+# --- Airborne jump (iteration 11) ---
+
+def test_same_cell_reclick_starts_airborne_jump():
+    board, game = make_game([["wK"]])
+    game.handle_click(50, 50)   # select wK at (0, 0)
+    game.handle_click(50, 50)   # jump in place
+    assert len(game._active_moves) == 1
+    move = game._active_moves[0]
+    assert move["jump"] is True
+    assert move["from"] == (0, 0)
+    assert move["to"] == (0, 0)
+    assert move["remaining"] == DEFAULT_JUMP_DURATION_MS
+    assert move["route"] == []
+
+
+def test_jump_completes_with_piece_still_on_original_cell():
+    board, game = make_game([["wK"]])
+    game.handle_click(50, 50)
+    game.handle_click(50, 50)
+    finish_move(game, ms=DEFAULT_JUMP_DURATION_MS)
+    assert board.get_cell(0, 0).token == "wK"
+    assert not game._active_moves
+
+
+def test_moving_piece_cannot_jump():
+    board, game = make_game([["wK", "."]])
+    game.handle_click(50, 50)
+    game.handle_click(150, 50)   # wK moving to (0, 1)
+    game.handle_click(150, 150)  # try to select moving origin - fails
+    game._selected = (0, 0)      # stale selection at moving origin
+    game.handle_click(50, 50)    # try to jump - blocked
+    assert len(game._active_moves) == 1
+    assert not game._active_moves[0].get("jump")
+
+
+def test_enemy_arriving_at_airborne_cell_is_captured():
+    rows = [["wK", ".", "bR"]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)    # select wK at (0, 0)
+    game.handle_click(50, 50)    # jump at (0, 0)
+    game.handle_click(250, 50)   # select bR at (0, 2)
+    game.handle_click(50, 50)    # bR moves to (0, 0)
+    finish_move(game, ms=DEFAULT_JUMP_DURATION_MS)
+    assert board.get_cell(0, 0).token == "wK"
+    assert board.get_cell(0, 2) is None
+
+
+def test_jump_allowed_while_enemy_en_route_to_same_cell():
+    rows = [["wK", ".", "bR"]]
+    board, game = make_game(rows)
+    game.handle_click(250, 50)   # select bR at (0, 2)
+    game.handle_click(50, 50)    # bR moving to (0, 0)
+    game.handle_click(50, 50)    # select wK
+    game.handle_click(50, 50)    # jump at (0, 0) - not blocked by en-route bR
+    assert len(game._active_moves) == 2
+    assert any(move.get("jump") for move in game._active_moves)
+
+
+def test_same_cell_reclick_on_empty_cell_clears_selection():
+    board, game = make_game([[".", "wK"]])
+    game.handle_click(150, 50)   # select wK at (0, 1)
+    game._selected = (0, 0)      # force selection on empty cell
+    game.handle_click(50, 50)    # click same empty cell
+    assert game._selected is None

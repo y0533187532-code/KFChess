@@ -112,3 +112,9 @@ def test_move_piece_with_promotion_places_promoted_type():
     board.move_piece(0, 1, 0, 0, promotion_piece_type="Q")
     assert board.get_cell(0, 0).token == "wQ"
     assert board.get_cell(0, 1) is None
+
+
+def test_clear_cell_empties_a_cell():
+    board = Board([["wK"]])
+    board.clear_cell(0, 0)
+    assert board.get_cell(0, 0) is None

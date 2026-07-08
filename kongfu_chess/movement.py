@@ -176,8 +176,13 @@ def is_route_conflict(
     new_route,
     existing_color,
     new_color,
+    existing_jump=False,
+    new_jump=False,
 ):
     """Return True if ``new`` cannot be queued while ``existing`` is in-flight."""
+    if existing_jump or new_jump:
+        return False
+
     if is_swap_route(existing_from, existing_to, existing_color, new_from, new_to, new_color):
         return False
 

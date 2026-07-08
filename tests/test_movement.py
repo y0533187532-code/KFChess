@@ -293,3 +293,18 @@ def test_is_route_conflict_false_for_enemy_swap():
         (0, 2), (0, 0), [(0, 1), (0, 0)],
         "w", "b",
     ) is False
+
+
+def test_is_route_conflict_false_when_either_move_is_a_jump():
+    assert is_route_conflict(
+        (0, 0), (0, 0), [],
+        (0, 4), (0, 0), [(0, 0)],
+        "w", "b",
+        existing_jump=True,
+    ) is False
+    assert is_route_conflict(
+        (0, 0), (0, 2), [(0, 1), (0, 2)],
+        (0, 4), (0, 0), [(0, 0)],
+        "w", "b",
+        new_jump=True,
+    ) is False

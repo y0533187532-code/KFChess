@@ -45,8 +45,13 @@ CELL_SIZE_PX = 100
 # vocabulary lives in one place, same spirit as the section headers above.
 CLICK_COMMAND = "click"
 WAIT_COMMAND = "wait"
+JUMP_COMMAND = "jump"
 PRINT_COMMAND = "print"
 PRINT_BOARD_ARGUMENT = "board"
+
+# --- Airborne jump duration (milliseconds) ---
+# Injectable via Game(jump_duration_ms=...) for custom games.
+DEFAULT_JUMP_DURATION_MS = 1000
 
 # --- Real-time move travel durations (milliseconds per piece type) ---
 # Injectable via Game(move_durations=...) for custom games.

@@ -25,6 +25,13 @@ def test_click_command_is_dispatched_to_the_game():
     assert board.get_cell(0, 1).token == "wK"
 
 
+def test_jump_command_selects_then_starts_airborne_jump():
+    board, runner, stdout = make_runner([["wK"]])
+    runner.run(["jump 50 50", "wait 1000"])
+    assert board.get_cell(0, 0).token == "wK"
+    assert not runner._game._active_moves
+
+
 def test_wait_command_is_dispatched_without_error():
     board, runner, stdout = make_runner([["wK"]])
     runner.run(["wait 250"])

@@ -8,7 +8,13 @@ ever changes (e.g. a binary/network protocol instead of text lines), only
 this class needs to change.
 """
 
-from .config import CLICK_COMMAND, WAIT_COMMAND, PRINT_COMMAND, PRINT_BOARD_ARGUMENT
+from .config import (
+    CLICK_COMMAND,
+    JUMP_COMMAND,
+    PRINT_COMMAND,
+    PRINT_BOARD_ARGUMENT,
+    WAIT_COMMAND,
+)
 
 
 class CommandRunner:
@@ -30,6 +36,8 @@ class CommandRunner:
 
         if command == CLICK_COMMAND:
             self._run_click(arguments)
+        elif command == JUMP_COMMAND:
+            self._run_jump(arguments)
         elif command == WAIT_COMMAND:
             self._run_wait(arguments)
         elif command == PRINT_COMMAND:
@@ -37,6 +45,11 @@ class CommandRunner:
 
     def _run_click(self, arguments):
         pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
+        self._game.handle_click(pixel_x, pixel_y)
+
+    def _run_jump(self, arguments):
+        pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
+        self._game.handle_click(pixel_x, pixel_y)
         self._game.handle_click(pixel_x, pixel_y)
 
     def _run_wait(self, arguments):
