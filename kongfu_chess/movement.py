@@ -72,7 +72,7 @@ def is_pawn_move(
     return False
 
 
-def is_king_move(dr, dc):
+def is_king_move(dr, dc): 
     return max(abs(dr), abs(dc)) == 1
 
 
