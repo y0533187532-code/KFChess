@@ -13,6 +13,8 @@ ever touching this module - nothing here assumes only these five piece
 types will ever exist.
 """
 
+from .config import PAWN_PIECE_TYPE
+
 
 def is_king_move(dr, dc):
     return max(abs(dr), abs(dc)) == 1
@@ -34,10 +36,27 @@ def is_queen_move(dr, dc):
     return is_rook_move(dr, dc) or is_bishop_move(dr, dc)
 
 
-# Default rule-set for the five piece types this iteration covers. Pawn is
-# intentionally absent (out of scope for now) - MovementRules.is_legal
-# treats "no rule registered" as "illegal", so clicking a pawn is safely
-# ignored rather than raising an error.
+def is_pawn_move(dr, dc, color, target_piece):
+    """Return True if a pawn of ``color`` can move by (dr, dc) to a cell
+    occupied by ``target_piece`` (a Piece or None for an empty cell).
+
+    Exported so unit tests can call it directly without going through
+    MovementRules. Game always goes through MovementRules.is_legal so it
+    stays unaware of which piece types need context and which do not.
+    """
+    forward = -1 if color == "w" else 1
+    if dc == 0 and dr == forward:
+        return target_piece is None
+    if abs(dc) == 1 and dr == forward:
+        return target_piece is not None and target_piece.color != color
+    return False
+
+
+# Default rule-set for the five non-pawn piece types.
+# Pawn is absent here because its rule needs context (color + target_piece)
+# that the plain (dr, dc) signature cannot carry. MovementRules.is_legal
+# handles pawn transparently via is_pawn_move, so callers never need to
+# know which piece types are "special".
 DEFAULT_MOVEMENT_RULES = {
     "K": is_king_move,
     "R": is_rook_move,
@@ -81,13 +100,16 @@ class MovementRules:
             sliding_piece_types if sliding_piece_types is not None else DEFAULT_SLIDING_PIECE_TYPES
         )
 
-    def is_legal(self, piece_type, dr, dc):
-        """Return True if moving by (dr, dc) is a legal shape for piece_type.
+    def is_legal(self, piece_type, dr, dc, color=None, target_piece=None):
+        """Return True if the move is legal for piece_type.
 
-        A piece type with no registered rule (e.g. pawn, today) is simply
-        not legal yet - this never raises, so an unsupported piece type
-        is safely ignored rather than crashing the game loop.
+        For context-free pieces (K, Q, R, B, N) only dr/dc matter.
+        For context-dependent pieces (P) color and target_piece are also
+        used. Game always calls this single method - it never needs to
+        know which piece types need extra context (Encapsulation / SRP).
         """
+        if piece_type == PAWN_PIECE_TYPE:
+            return is_pawn_move(dr, dc, color, target_piece)
         rule = self._rules.get(piece_type)
         return rule is not None and rule(dr, dc)
 

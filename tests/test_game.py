@@ -182,3 +182,59 @@ def test_piece_can_capture_an_enemy_piece_at_the_destination():
 
     assert board.get_cell(0, 0) is None
     assert board.get_cell(0, 2).token == "wR"
+
+
+# --- Pawn integration tests (via Game) ---
+
+def test_white_pawn_moves_one_cell_forward():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)  # select wP at (1, 1)
+    game.handle_click(150, 50)   # move to (0, 1) - one step forward for white
+    assert board.get_cell(0, 1).token == "wP"
+    assert board.get_cell(1, 1) is None
+
+
+def test_black_pawn_moves_one_cell_forward():
+    rows = [[".", ".", "."], [".", "bP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)  # select bP at (1, 1)
+    game.handle_click(150, 250)  # move to (2, 1) - one step forward for black
+    assert board.get_cell(2, 1).token == "bP"
+    assert board.get_cell(1, 1) is None
+
+
+def test_white_pawn_cannot_move_two_cells():
+    rows = [[".", ".", "."], [".", ".", "."], [".", "wP", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 250)  # select wP at (2, 1)
+    game.handle_click(150, 50)   # try to move two cells forward to (0, 1)
+    assert board.get_cell(2, 1).token == "wP"  # never moved
+    assert board.get_cell(0, 1) is None
+
+
+def test_white_pawn_captures_diagonally():
+    rows = [[".", "bN", "."], ["wP", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 150)   # select wP at (1, 0)
+    game.handle_click(150, 50)   # capture bN at (0, 1)
+    assert board.get_cell(0, 1).token == "wP"
+    assert board.get_cell(1, 0) is None
+
+
+def test_black_pawn_captures_diagonally():
+    rows = [[".", ".", "."], [".", "bP", "."], ["wN", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)  # select bP at (1, 1)
+    game.handle_click(50, 250)   # capture wN at (2, 0)
+    assert board.get_cell(2, 0).token == "bP"
+    assert board.get_cell(1, 1) is None
+
+
+def test_pawn_cannot_capture_forward_without_diagonal():
+    rows = [["bN", ".", "."], ["wP", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 150)   # select wP at (1, 0)
+    game.handle_click(50, 50)    # try to capture bN directly forward - illegal
+    assert board.get_cell(1, 0).token == "wP"  # never moved
+    assert board.get_cell(0, 0).token == "bN"  # never captured

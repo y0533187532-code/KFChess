@@ -7,6 +7,7 @@ from kongfu_chess.movement import (
     is_king_move,
     is_knight_move,
     is_path_clear,
+    is_pawn_move,
     is_queen_move,
     is_rook_move,
 )
@@ -121,3 +122,66 @@ def test_is_path_clear_works_diagonally():
 def test_is_path_clear_true_for_adjacent_cells_with_no_cell_between():
     board = Board([["wR", "."]])
     assert is_path_clear(board, 0, 0, 0, 1) is True
+
+
+# --- Pawn movement rules ---
+
+def test_white_pawn_moves_forward_one_cell_to_empty():
+    assert is_pawn_move(-1, 0, "w", None) is True
+
+
+def test_black_pawn_moves_forward_one_cell_to_empty():
+    assert is_pawn_move(1, 0, "b", None) is True
+
+
+def test_white_pawn_cannot_move_backward():
+    assert is_pawn_move(1, 0, "w", None) is False
+
+
+def test_black_pawn_cannot_move_backward():
+    assert is_pawn_move(-1, 0, "b", None) is False
+
+
+def test_white_pawn_cannot_move_two_cells():
+    assert is_pawn_move(-2, 0, "w", None) is False
+
+
+def test_pawn_cannot_move_forward_to_occupied_cell():
+    from kongfu_chess.piece import Piece
+    blocker = Piece(color="b", piece_type="P")
+    assert is_pawn_move(-1, 0, "w", blocker) is False
+
+
+def test_white_pawn_captures_diagonally_forward():
+    from kongfu_chess.piece import Piece
+    enemy = Piece(color="b", piece_type="N")
+    assert is_pawn_move(-1, 1, "w", enemy) is True
+    assert is_pawn_move(-1, -1, "w", enemy) is True
+
+
+def test_black_pawn_captures_diagonally_forward():
+    from kongfu_chess.piece import Piece
+    enemy = Piece(color="w", piece_type="N")
+    assert is_pawn_move(1, 1, "b", enemy) is True
+    assert is_pawn_move(1, -1, "b", enemy) is True
+
+
+def test_pawn_cannot_capture_forward_without_diagonal():
+    from kongfu_chess.piece import Piece
+    enemy = Piece(color="b", piece_type="N")
+    assert is_pawn_move(-1, 0, "w", enemy) is False
+
+
+def test_pawn_cannot_capture_own_color_diagonally():
+    from kongfu_chess.piece import Piece
+    friendly = Piece(color="w", piece_type="N")
+    assert is_pawn_move(-1, 1, "w", friendly) is False
+
+
+def test_movement_rules_is_legal_delegates_to_pawn_correctly():
+    from kongfu_chess.piece import Piece
+    rules = MovementRules()
+    enemy = Piece(color="b", piece_type="P")
+    assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is True
+    assert rules.is_legal("P", -1, 1, color="w", target_piece=enemy) is True
+    assert rules.is_legal("P", -2, 0, color="w", target_piece=None) is False

@@ -25,6 +25,10 @@ TOKEN_LENGTH = 2  # e.g. "wP" = color + piece type
 DEFAULT_VALID_PIECE_TYPES = frozenset({"K", "Q", "R", "B", "N", "P"})
 DEFAULT_VALID_COLORS = frozenset({"w", "b"})
 
+# Piece type letter for the pawn - used by Game to dispatch to the
+# context-aware is_legal_pawn instead of the generic is_legal.
+PAWN_PIECE_TYPE = "P"
+
 # --- Click protocol: pixel <-> cell geometry ---
 # A single source of truth for cell size, so it's never repeated (DRY) and
 # never buried as a magic number inside click-handling logic.

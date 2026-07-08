@@ -76,10 +76,11 @@ class Game:
         from_row, from_col = self._selected
         piece = self._selected_piece
         dr, dc = row - from_row, col - from_col
+        target_piece = self._board.get_cell(row, col)
 
-        if self._movement_rules.is_legal(piece.piece_type, dr, dc) and self._path_is_clear(
-            piece.piece_type, from_row, from_col, row, col
-        ):
+        if self._movement_rules.is_legal(
+            piece.piece_type, dr, dc, color=piece.color, target_piece=target_piece
+        ) and self._path_is_clear(piece.piece_type, from_row, from_col, row, col):
             self._board.move_piece(from_row, from_col, row, col)
 
         self._selected = None
