@@ -13,7 +13,63 @@ ever touching this module - nothing here assumes only these five piece
 types will ever exist.
 """
 
-from .config import PAWN_PIECE_TYPE
+from .config import (
+    DEFAULT_PAWN_FORWARD_BY_COLOR,
+    DEFAULT_PAWN_START_ROW_BY_COLOR,
+    PAWN_PIECE_TYPE,
+)
+
+
+def pawn_start_row(color, num_rows, start_row_by_color=DEFAULT_PAWN_START_ROW_BY_COLOR):
+    placement = start_row_by_color[color]
+    if placement == "bottom":
+        return num_rows - 1
+    return 0
+
+
+def is_promotion_row(row, num_rows):
+    return row == 0 or row == num_rows - 1
+
+
+def is_pawn_move(
+    dr,
+    dc,
+    color,
+    target_piece,
+    board=None,
+    from_row=None,
+    from_col=None,
+    to_col=None,
+    forward_by_color=DEFAULT_PAWN_FORWARD_BY_COLOR,
+    start_row_by_color=DEFAULT_PAWN_START_ROW_BY_COLOR,
+):
+    """Return True if a pawn of ``color`` can move by (dr, dc) to a cell
+    occupied by ``target_piece`` (a Piece or None for an empty cell).
+
+    For a double-step forward from the start row, ``board``, ``from_row``,
+    ``from_col``, and ``to_col`` are required to verify the intermediate
+    cell is empty.
+    """
+    forward = forward_by_color[color]
+    if dc == 0 and dr == forward:
+        return target_piece is None
+    if (
+        dc == 0
+        and dr == 2 * forward
+        and board is not None
+        and from_row is not None
+        and from_col is not None
+        and to_col is not None
+    ):
+        if from_row != pawn_start_row(color, board.num_rows, start_row_by_color):
+            return False
+        if target_piece is not None:
+            return False
+        inter_row = from_row + forward
+        return board.get_cell(inter_row, to_col) is None
+    if abs(dc) == 1 and dr == forward:
+        return target_piece is not None and target_piece.color != color
+    return False
 
 
 def is_king_move(dr, dc):
@@ -34,53 +90,6 @@ def is_knight_move(dr, dc):
 
 def is_queen_move(dr, dc):
     return is_rook_move(dr, dc) or is_bishop_move(dr, dc)
-
-
-def pawn_start_row(color, num_rows):
-    return num_rows - 1 if color == "w" else 0
-
-
-def is_promotion_row(row, num_rows):
-    return row == 0 or row == num_rows - 1
-
-
-def is_pawn_move(
-    dr,
-    dc,
-    color,
-    target_piece,
-    board=None,
-    from_row=None,
-    from_col=None,
-    to_col=None,
-):
-    """Return True if a pawn of ``color`` can move by (dr, dc) to a cell
-    occupied by ``target_piece`` (a Piece or None for an empty cell).
-
-    For a double-step forward from the start row, ``board``, ``from_row``,
-    ``from_col``, and ``to_col`` are required to verify the intermediate
-    cell is empty.
-    """
-    forward = -1 if color == "w" else 1
-    if dc == 0 and dr == forward:
-        return target_piece is None
-    if (
-        dc == 0
-        and dr == 2 * forward
-        and board is not None
-        and from_row is not None
-        and from_col is not None
-        and to_col is not None
-    ):
-        if from_row != pawn_start_row(color, board.num_rows):
-            return False
-        if target_piece is not None:
-            return False
-        inter_row = from_row + forward
-        return board.get_cell(inter_row, to_col) is None
-    if abs(dc) == 1 and dr == forward:
-        return target_piece is not None and target_piece.color != color
-    return False
 
 
 # Default rule-set for the five non-pawn piece types.
@@ -196,10 +205,26 @@ def is_route_conflict(
 
 
 class MovementRules:
-    def __init__(self, rules=None, sliding_piece_types=None):
+    def __init__(
+        self,
+        rules=None,
+        sliding_piece_types=None,
+        pawn_forward_by_color=None,
+        pawn_start_row_by_color=None,
+    ):
         self._rules = dict(rules if rules is not None else DEFAULT_MOVEMENT_RULES)
         self._sliding_piece_types = set(
             sliding_piece_types if sliding_piece_types is not None else DEFAULT_SLIDING_PIECE_TYPES
+        )
+        self._pawn_forward_by_color = dict(
+            pawn_forward_by_color
+            if pawn_forward_by_color is not None
+            else DEFAULT_PAWN_FORWARD_BY_COLOR
+        )
+        self._pawn_start_row_by_color = dict(
+            pawn_start_row_by_color
+            if pawn_start_row_by_color is not None
+            else DEFAULT_PAWN_START_ROW_BY_COLOR
         )
 
     def is_legal(
@@ -232,6 +257,8 @@ class MovementRules:
                 from_row=from_row,
                 from_col=from_col,
                 to_col=to_col,
+                forward_by_color=self._pawn_forward_by_color,
+                start_row_by_color=self._pawn_start_row_by_color,
             )
         rule = self._rules.get(piece_type)
         return rule is not None and rule(dr, dc)

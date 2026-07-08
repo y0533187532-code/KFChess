@@ -189,6 +189,12 @@ def test_pawn_start_row_and_promotion_row():
     assert is_promotion_row(1, 3) is False
 
 
+def test_pawn_forward_direction_is_injectable_via_movement_rules():
+    rules = MovementRules(pawn_forward_by_color={"w": 1, "b": -1})
+    assert rules.is_legal("P", 1, 0, color="w", target_piece=None) is True
+    assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is False
+
+
 def test_pawn_cannot_move_forward_to_occupied_cell():
     from kongfu_chess.piece import Piece
     blocker = Piece(color="b", piece_type="P")

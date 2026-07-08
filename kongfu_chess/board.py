@@ -6,14 +6,19 @@ Design notes for two known-but-not-yet-implemented future needs:
   is a private attribute. Nothing outside this class ever touches it
   directly - all access goes through ``get_cell`` / ``num_rows`` /
   ``num_cols``. When a compact/binary representation is introduced, only
-  the body of this class needs to change; every caller keeps working
-  against the same public interface.
+  the body of this class needs to change: ``_cells`` could become an
+  ``array('B')``, a bitboard, or any other encoding; ``get_cell`` would
+  decode a cell into a ``Piece``, and ``move_piece`` / ``clear_cell``
+  would encode writes. Every caller keeps working against the same public
+  interface.
 
 * Custom games / custom piece sets: ``valid_colors`` and
   ``valid_piece_types`` are constructor parameters (with the standard
   chess rule-set as their default). The board never hard-codes which
   colors or piece types are legal, so a "design your own game" feature can
   build a Board with a different rule-set without any change here.
+  Movement, promotion, and game-over rules are configured on ``Game`` and
+  ``MovementRules``, not on ``Board``.
 """
 
 from .config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES

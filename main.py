@@ -1,10 +1,13 @@
-"""Kong-Fu-Chess - Iteration 1: board & piece parsing.
+"""Kong-Fu-Chess — board parsing, real-time moves, and command replay.
 
 Git repo: https://github.com/y0533187532-code/KFChess
 
-`main()` only wires stdin -> `run()` -> stdout together (single
+Unit-test coverage: run ``py -m pytest`` (see ``pytest.ini``); HTML report
+is written to ``htmlcov/index.html``.
+
+``main()`` only wires stdin -> ``run()`` -> stdout together (single
 responsibility: orchestration). All the actual logic lives in the
-`kongfu_chess` package and is unit-tested there directly, and `run()`
+``kongfu_chess`` package and is unit-tested there directly, and ``run()``
 takes the raw text as a parameter (dependency injection) so tests can
 call it with any string, with no need to monkeypatch sys.stdin.
 """

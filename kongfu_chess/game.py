@@ -1,32 +1,30 @@
 """Game-state transitions driven by the click/wait protocol.
 
-A Game only knows how to react to two kinds of events - a click, and time
-passing - and how that changes selection/board state. It never touches the
-raw board grid directly (encapsulation): it moves pieces only through the
-Board's own public API (``get_cell`` / ``in_bounds`` / ``move_piece``).
+A Game reacts to clicks, time passing (``handle_wait``), and airborne jumps
+(same-cell re-click or the ``jump`` command). It never touches the raw board
+grid directly (encapsulation): pieces move only through Board's public API.
 
 Move legality is delegated to ``MovementRules`` (shape + path). In-flight
-moves are tracked in ``_active_moves``; multiple pieces may travel in
-parallel when their routes do not conflict. The board updates only when
-``handle_wait`` completes a move. After arrival there is no cooldown yet
-(future iteration can hook into ``_execute_move``).
+moves live in ``_active_moves``; parallel travel is allowed when routes do
+not conflict. The board updates when ``handle_wait`` completes a move or
+when an airborne jump captures an arriving enemy.
 
-Capturing the enemy king on move completion ends the game; subsequent
-``handle_click`` calls are ignored. ``handle_wait`` is unchanged.
+Capturing the configured game-over piece (default: king) ends the game;
+subsequent ``handle_click`` calls are ignored.
 
-``movement_rules`` and ``move_durations`` are constructor parameters
-(defaulting to the standard rule-set), the same pattern Board already uses
-for ``valid_colors``/``valid_piece_types`` - a future "design your own game"
-feature can hand Game custom instances without any change here.
+Extension hooks (defaults preserve standard Kong-Fu-Chess rules):
+- ``movement_rules`` — custom piece shapes / pawn direction maps
+- ``move_durations`` / ``jump_duration_ms`` — travel timings
+- ``promotion_policy(moving_piece, to_row, num_rows) -> piece_type | None``
+- ``game_over_piece_type`` — which captured piece type ends the game
 """
 
 from .config import (
     CELL_SIZE_PX,
     DEFAULT_JUMP_DURATION_MS,
     DEFAULT_MOVE_DURATION_MS,
+    DEFAULT_PROMOTION_BY_PIECE_TYPE,
     KING_PIECE_TYPE,
-    PAWN_PIECE_TYPE,
-    QUEEN_PIECE_TYPE,
 )
 from .movement import (
     MovementRules,
@@ -38,6 +36,13 @@ from .movement import (
 )
 
 
+def default_promotion_policy(moving_piece, to_row, num_rows):
+    """Standard promotion: pawn -> queen on the first or last row."""
+    if moving_piece is None or not is_promotion_row(to_row, num_rows):
+        return None
+    return DEFAULT_PROMOTION_BY_PIECE_TYPE.get(moving_piece.piece_type)
+
+
 class Game:
     def __init__(
         self,
@@ -45,6 +50,8 @@ class Game:
         movement_rules=None,
         move_durations=None,
         jump_duration_ms=None,
+        promotion_policy=None,
+        game_over_piece_type=None,
     ):
         self._board = board
         self._movement_rules = movement_rules or MovementRules()
@@ -55,6 +62,12 @@ class Game:
             jump_duration_ms
             if jump_duration_ms is not None
             else DEFAULT_JUMP_DURATION_MS
+        )
+        self._promotion_policy = promotion_policy or default_promotion_policy
+        self._game_over_piece_type = (
+            game_over_piece_type
+            if game_over_piece_type is not None
+            else KING_PIECE_TYPE
         )
         self._selected = None  # None, or a (row, col) tuple
         self._active_moves = []
@@ -263,18 +276,15 @@ class Game:
         to_row, to_col = move["to"]
         captured = self._board.get_cell(to_row, to_col)
         moving = self._board.get_cell(from_row, from_col)
-        promotion = None
-        if (
-            moving is not None
-            and moving.piece_type == PAWN_PIECE_TYPE
-            and is_promotion_row(to_row, self._board.num_rows)
-        ):
-            promotion = QUEEN_PIECE_TYPE
+        promotion = self._resolve_promotion(moving, to_row)
         self._board.move_piece(
             from_row, from_col, to_row, to_col, promotion_piece_type=promotion
         )
         if self._is_enemy_king_capture(captured, move["color"]):
             self._game_over = True
+
+    def _resolve_promotion(self, moving, to_row):
+        return self._promotion_policy(moving, to_row, self._board.num_rows)
 
     def _is_captured_by_airborne_jump(self, move, airborne_jumps):
         to_row, to_col = move["to"]
@@ -287,7 +297,7 @@ class Game:
     def _is_enemy_king_capture(self, captured_piece, moving_color):
         return (
             captured_piece is not None
-            and captured_piece.piece_type == KING_PIECE_TYPE
+            and captured_piece.piece_type == self._game_over_piece_type
             and captured_piece.color != moving_color
         )
 

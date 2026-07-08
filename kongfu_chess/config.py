@@ -11,6 +11,12 @@ not inline in business logic. This has two purposes:
    values - they are passed in as parameters with these as defaults, so a
    custom game can supply a completely different rule-set (different piece
    letters, more than two colors, etc.) without touching any parsing code.
+
+Future extension points (not implemented yet):
+- Binary board: only Board._cells internals change; callers keep using
+  get_cell / move_piece / clear_cell.
+- Custom games: inject MovementRules, promotion_policy, game_over_piece_type,
+  pawn direction maps, and Board(valid_colors=..., valid_piece_types=...).
 """
 
 # --- Section headers in the input protocol ---
@@ -25,6 +31,9 @@ TOKEN_LENGTH = 2  # e.g. "wP" = color + piece type
 DEFAULT_VALID_PIECE_TYPES = frozenset({"K", "Q", "R", "B", "N", "P"})
 DEFAULT_VALID_COLORS = frozenset({"w", "b"})
 
+WHITE_COLOR = "w"
+BLACK_COLOR = "b"
+
 # Piece type letter for the pawn - used by Game to dispatch to the
 # context-aware is_legal_pawn instead of the generic is_legal.
 PAWN_PIECE_TYPE = "P"
@@ -34,6 +43,13 @@ KING_PIECE_TYPE = "K"
 
 # Piece type letter a pawn promotes to on the last row.
 QUEEN_PIECE_TYPE = "Q"
+
+# Default pawn direction and start row per color (injectable via MovementRules).
+DEFAULT_PAWN_FORWARD_BY_COLOR = {WHITE_COLOR: -1, BLACK_COLOR: 1}
+DEFAULT_PAWN_START_ROW_BY_COLOR = {WHITE_COLOR: "bottom", BLACK_COLOR: "top"}
+
+# Default promotion targets per piece type on the last row (injectable via Game).
+DEFAULT_PROMOTION_BY_PIECE_TYPE = {PAWN_PIECE_TYPE: QUEEN_PIECE_TYPE}
 
 # --- Click protocol: pixel <-> cell geometry ---
 # A single source of truth for cell size, so it's never repeated (DRY) and

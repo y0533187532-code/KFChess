@@ -553,3 +553,48 @@ def test_same_cell_reclick_on_empty_cell_clears_selection():
     game._selected = (0, 0)      # force selection on empty cell
     game.handle_click(50, 50)    # click same empty cell
     assert game._selected is None
+
+
+# --- Extensibility hooks ---
+
+def test_default_promotion_policy_returns_none_for_missing_piece():
+    from kongfu_chess.game import default_promotion_policy
+
+    assert default_promotion_policy(None, 0, 3) is None
+
+
+def test_custom_promotion_policy_can_disable_promotion():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    game = Game(board, promotion_policy=lambda moving, to_row, num_rows: None)
+    game.handle_click(150, 150)
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wP"
+
+
+def test_custom_promotion_policy_can_target_different_piece():
+    from kongfu_chess.movement import is_promotion_row
+
+    def promote_to_rook(moving, to_row, num_rows):
+        if is_promotion_row(to_row, num_rows):
+            return "R"
+        return None
+
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    game = Game(board, promotion_policy=promote_to_rook)
+    game.handle_click(150, 150)
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wR"
+
+
+def test_custom_game_over_piece_type():
+    board = Board([["wR", "bQ"]])
+    game = Game(board, game_over_piece_type="Q")
+    game.handle_click(50, 50)
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert game.is_game_over
+    assert board.get_cell(0, 1).token == "wR"
