@@ -23,7 +23,7 @@ change.
 """
 
 from .config import CELL_SIZE_PX
-from .movement import MovementRules
+from .movement import MovementRules, is_path_clear
 
 
 class Game:
@@ -77,10 +77,17 @@ class Game:
         piece = self._selected_piece
         dr, dc = row - from_row, col - from_col
 
-        if self._movement_rules.is_legal(piece.piece_type, dr, dc):
+        if self._movement_rules.is_legal(piece.piece_type, dr, dc) and self._path_is_clear(
+            piece.piece_type, from_row, from_col, row, col
+        ):
             self._board.move_piece(from_row, from_col, row, col)
 
         self._selected = None
+
+    def _path_is_clear(self, piece_type, from_row, from_col, row, col):
+        if not self._movement_rules.requires_clear_path(piece_type):
+            return True
+        return is_path_clear(self._board, from_row, from_col, row, col)
 
     def _pixel_to_cell(self, pixel_x, pixel_y):
         return pixel_y // CELL_SIZE_PX, pixel_x // CELL_SIZE_PX

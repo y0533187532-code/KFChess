@@ -1,10 +1,12 @@
 import pytest
 
+from kongfu_chess.board import Board
 from kongfu_chess.movement import (
     MovementRules,
     is_bishop_move,
     is_king_move,
     is_knight_move,
+    is_path_clear,
     is_queen_move,
     is_rook_move,
 )
@@ -75,3 +77,47 @@ def test_movement_rules_can_be_constructed_with_a_fully_custom_rule_set():
     custom_rules = MovementRules(rules={"X": lambda dr, dc: True})
     assert custom_rules.is_legal("X", 5, 5) is True
     assert custom_rules.is_legal("K", 1, 0) is False  # standard "K" not present here
+
+
+def test_rook_bishop_queen_require_clear_path_by_default():
+    rules = MovementRules()
+    assert rules.requires_clear_path("R") is True
+    assert rules.requires_clear_path("B") is True
+    assert rules.requires_clear_path("Q") is True
+
+
+def test_knight_and_king_do_not_require_clear_path_by_default():
+    rules = MovementRules()
+    assert rules.requires_clear_path("N") is False
+    assert rules.requires_clear_path("K") is False
+
+
+def test_register_can_mark_a_custom_piece_type_as_sliding():
+    rules = MovementRules()
+    rules.register("D", lambda dr, dc: True, sliding=True)
+    assert rules.requires_clear_path("D") is True
+
+
+def test_is_path_clear_true_when_no_blockers_between():
+    board = Board([["wR", ".", ".", "."]])
+    assert is_path_clear(board, 0, 0, 0, 3) is True
+
+
+def test_is_path_clear_false_when_a_piece_blocks_the_way():
+    board = Board([["wR", ".", "bN", "."]])
+    assert is_path_clear(board, 0, 0, 0, 3) is False
+
+
+def test_is_path_clear_works_diagonally():
+    rows = [["wB", ".", "."], [".", ".", "."], [".", ".", "."]]
+    board = Board(rows)
+    assert is_path_clear(board, 0, 0, 2, 2) is True
+
+    rows_blocked = [["wB", ".", "."], [".", "bN", "."], [".", ".", "."]]
+    board_blocked = Board(rows_blocked)
+    assert is_path_clear(board_blocked, 0, 0, 2, 2) is False
+
+
+def test_is_path_clear_true_for_adjacent_cells_with_no_cell_between():
+    board = Board([["wR", "."]])
+    assert is_path_clear(board, 0, 0, 0, 1) is True
