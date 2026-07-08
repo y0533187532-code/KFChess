@@ -60,9 +60,9 @@ def test_movement_rules_uses_default_rules_for_known_piece_types():
 
 
 def test_movement_rules_returns_false_for_unregistered_piece_type():
-    # e.g. Pawn - not yet supported - must be safely "illegal", never raise.
+    # A completely unknown piece type must be safely "illegal", never raise.
     rules = MovementRules()
-    assert rules.is_legal("P", 1, 0) is False
+    assert rules.is_legal("X", 1, 0) is False
 
 
 def test_movement_rules_supports_registering_a_custom_piece_type():
