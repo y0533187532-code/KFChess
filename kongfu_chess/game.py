@@ -20,11 +20,18 @@ for ``valid_colors``/``valid_piece_types`` - a future "design your own game"
 feature can hand Game custom instances without any change here.
 """
 
-from .config import CELL_SIZE_PX, DEFAULT_MOVE_DURATION_MS, KING_PIECE_TYPE
+from .config import (
+    CELL_SIZE_PX,
+    DEFAULT_MOVE_DURATION_MS,
+    KING_PIECE_TYPE,
+    PAWN_PIECE_TYPE,
+    QUEEN_PIECE_TYPE,
+)
 from .movement import (
     MovementRules,
     get_move_route,
     is_path_clear,
+    is_promotion_row,
     is_route_conflict,
     is_swap_route,
 )
@@ -131,7 +138,16 @@ class Game:
 
         if not (
             self._movement_rules.is_legal(
-                piece.piece_type, dr, dc, color=piece.color, target_piece=target_piece
+                piece.piece_type,
+                dr,
+                dc,
+                color=piece.color,
+                target_piece=target_piece,
+                board=self._board,
+                from_row=from_row,
+                from_col=from_col,
+                to_row=row,
+                to_col=col,
             )
             and self._path_is_clear(piece.piece_type, from_row, from_col, row, col)
         ):
@@ -173,7 +189,17 @@ class Game:
         from_row, from_col = move["from"]
         to_row, to_col = move["to"]
         captured = self._board.get_cell(to_row, to_col)
-        self._board.move_piece(from_row, from_col, to_row, to_col)
+        moving = self._board.get_cell(from_row, from_col)
+        promotion = None
+        if (
+            moving is not None
+            and moving.piece_type == PAWN_PIECE_TYPE
+            and is_promotion_row(to_row, self._board.num_rows)
+        ):
+            promotion = QUEEN_PIECE_TYPE
+        self._board.move_piece(
+            from_row, from_col, to_row, to_col, promotion_piece_type=promotion
+        )
         if self._is_enemy_king_capture(captured, move["color"]):
             self._game_over = True
 

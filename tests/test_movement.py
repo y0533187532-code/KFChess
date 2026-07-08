@@ -9,10 +9,12 @@ from kongfu_chess.movement import (
     is_knight_move,
     is_path_clear,
     is_pawn_move,
+    is_promotion_row,
     is_queen_move,
     is_route_conflict,
     is_rook_move,
     is_swap_route,
+    pawn_start_row,
 )
 
 
@@ -145,8 +147,46 @@ def test_black_pawn_cannot_move_backward():
     assert is_pawn_move(-1, 0, "b", None) is False
 
 
-def test_white_pawn_cannot_move_two_cells():
+def test_white_pawn_cannot_move_two_cells_without_board_context():
     assert is_pawn_move(-2, 0, "w", None) is False
+
+
+def test_white_pawn_double_step_from_start_row_with_clear_path():
+    board = Board([[".", "."], [".", "."], [".", "wP"]])
+    assert is_pawn_move(
+        -2, 0, "w", None, board=board, from_row=2, from_col=1, to_col=1
+    ) is True
+
+
+def test_white_pawn_double_step_rejected_when_not_on_start_row():
+    board = Board([[".", "."], [".", "wP"], [".", "."]])
+    assert is_pawn_move(
+        -2, 0, "w", None, board=board, from_row=1, from_col=1, to_col=1
+    ) is False
+
+
+def test_white_pawn_double_step_rejected_when_intermediate_blocked():
+    board = Board([[".", "."], [".", "bN"], [".", "wP"]])
+    assert is_pawn_move(
+        -2, 0, "w", None, board=board, from_row=2, from_col=1, to_col=1
+    ) is False
+
+
+def test_white_pawn_double_step_rejected_when_destination_occupied():
+    from kongfu_chess.piece import Piece
+    blocker = Piece(color="b", piece_type="N")
+    board = Board([[".", "bN"], [".", "."], [".", "wP"]])
+    assert is_pawn_move(
+        -2, 0, "w", blocker, board=board, from_row=2, from_col=1, to_col=1
+    ) is False
+
+
+def test_pawn_start_row_and_promotion_row():
+    assert pawn_start_row("w", 3) == 2
+    assert pawn_start_row("b", 3) == 0
+    assert is_promotion_row(0, 3) is True
+    assert is_promotion_row(2, 3) is True
+    assert is_promotion_row(1, 3) is False
 
 
 def test_pawn_cannot_move_forward_to_occupied_cell():
@@ -185,9 +225,22 @@ def test_movement_rules_is_legal_delegates_to_pawn_correctly():
     from kongfu_chess.piece import Piece
     rules = MovementRules()
     enemy = Piece(color="b", piece_type="P")
+    board = Board([[".", "."], [".", "."], [".", "wP"]])
     assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is True
     assert rules.is_legal("P", -1, 1, color="w", target_piece=enemy) is True
     assert rules.is_legal("P", -2, 0, color="w", target_piece=None) is False
+    assert rules.is_legal(
+        "P",
+        -2,
+        0,
+        color="w",
+        target_piece=None,
+        board=board,
+        from_row=2,
+        from_col=1,
+        to_row=0,
+        to_col=1,
+    ) is True
 
 
 # --- Move route and conflict detection ---
@@ -198,6 +251,14 @@ def test_get_move_route_for_rook_includes_intermediate_cells():
 
 def test_get_move_route_for_knight_is_destination_only():
     assert get_move_route(0, 0, 1, 2, "N") == [(1, 2)]
+
+
+def test_get_move_route_for_pawn_double_step_includes_intermediate():
+    assert get_move_route(2, 1, 0, 1, "P") == [(1, 1), (0, 1)]
+
+
+def test_get_move_route_for_pawn_single_step_is_destination_only():
+    assert get_move_route(1, 1, 0, 1, "P") == [(0, 1)]
 
 
 def test_is_swap_route_true_for_enemy_swapping_endpoints():

@@ -73,16 +73,17 @@ class Board:
         """
         return 0 <= row < self.num_rows and 0 <= col < self.num_cols
 
-    def move_piece(self, from_row, from_col, to_row, to_col):
+    def move_piece(self, from_row, from_col, to_row, to_col, promotion_piece_type=None):
         """Move whatever occupies (from_row, from_col) to (to_row, to_col).
 
         The destination is simply overwritten (a capture), and the source
-        cell becomes empty. This is the only place outside __init__ that
-        writes to ``self._cells`` - callers never touch the grid directly,
-        which is exactly what keeps a future binary/compact representation
-        a purely internal change to this class.
+        cell becomes empty. When ``promotion_piece_type`` is set the moving
+        piece is placed as that type (same color) instead of its original
+        type - used for pawn promotion on the last row.
         """
         piece = self._cells[from_row][from_col]
+        if promotion_piece_type is not None:
+            piece = Piece(color=piece.color, piece_type=promotion_piece_type)
         self._cells[to_row][to_col] = piece
         self._cells[from_row][from_col] = None
     def render_rows(self):

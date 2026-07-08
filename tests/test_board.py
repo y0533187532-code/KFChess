@@ -105,3 +105,10 @@ def test_move_piece_onto_occupied_cell_captures_it():
     board = Board([["wK", "bQ"]])
     board.move_piece(0, 0, 0, 1)
     assert board.get_cell(0, 1).token == "wK"
+
+
+def test_move_piece_with_promotion_places_promoted_type():
+    board = Board([[".", "wP"]])
+    board.move_piece(0, 1, 0, 0, promotion_piece_type="Q")
+    assert board.get_cell(0, 0).token == "wQ"
+    assert board.get_cell(0, 1) is None

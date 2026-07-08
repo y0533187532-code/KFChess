@@ -360,7 +360,7 @@ def test_white_pawn_moves_one_cell_forward():
     game.handle_click(150, 150)  # select wP at (1, 1)
     game.handle_click(150, 50)   # move to (0, 1) - one step forward for white
     finish_move(game)
-    assert board.get_cell(0, 1).token == "wP"
+    assert board.get_cell(0, 1).token == "wQ"
     assert board.get_cell(1, 1) is None
 
 
@@ -370,16 +370,45 @@ def test_black_pawn_moves_one_cell_forward():
     game.handle_click(150, 150)  # select bP at (1, 1)
     game.handle_click(150, 250)  # move to (2, 1) - one step forward for black
     finish_move(game)
-    assert board.get_cell(2, 1).token == "bP"
+    assert board.get_cell(2, 1).token == "bQ"
     assert board.get_cell(1, 1) is None
 
 
-def test_white_pawn_cannot_move_two_cells():
+def test_white_pawn_cannot_move_two_cells_from_non_start_row():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)  # select wP at (1, 1) - not start row
+    game.handle_click(150, 50)   # try to move two cells forward to (0, 1)
+    assert board.get_cell(1, 1).token == "wP"  # never moved
+    assert board.get_cell(0, 1) is None
+
+
+def test_white_pawn_double_step_from_start_row():
     rows = [[".", ".", "."], [".", ".", "."], [".", "wP", "."]]
     board, game = make_game(rows)
+    game.handle_click(150, 250)  # select wP at (2, 1) - start row
+    game.handle_click(150, 50)   # double step to (0, 1)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wQ"
+    assert board.get_cell(2, 1) is None
+
+
+def test_black_pawn_double_step_from_start_row():
+    rows = [[".", "bP", "."], [".", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 50)   # select bP at (0, 1) - start row
+    game.handle_click(150, 250)  # double step to (2, 1)
+    finish_move(game)
+    assert board.get_cell(2, 1).token == "bQ"
+    assert board.get_cell(0, 1) is None
+
+
+def test_white_pawn_double_step_rejected_when_intermediate_blocked():
+    rows = [[".", ".", "."], [".", "bN", "."], [".", "wP", "."]]
+    board, game = make_game(rows)
     game.handle_click(150, 250)  # select wP at (2, 1)
-    game.handle_click(150, 50)   # try to move two cells forward to (0, 1)
-    assert board.get_cell(2, 1).token == "wP"  # never moved
+    game.handle_click(150, 50)   # try double step to (0, 1)
+    assert board.get_cell(2, 1).token == "wP"
     assert board.get_cell(0, 1) is None
 
 
@@ -389,7 +418,7 @@ def test_white_pawn_captures_diagonally():
     game.handle_click(50, 150)   # select wP at (1, 0)
     game.handle_click(150, 50)   # capture bN at (0, 1)
     finish_move(game)
-    assert board.get_cell(0, 1).token == "wP"
+    assert board.get_cell(0, 1).token == "wQ"
     assert board.get_cell(1, 0) is None
 
 
@@ -399,8 +428,22 @@ def test_black_pawn_captures_diagonally():
     game.handle_click(150, 150)  # select bP at (1, 1)
     game.handle_click(50, 250)   # capture wN at (2, 0)
     finish_move(game)
-    assert board.get_cell(2, 0).token == "bP"
+    assert board.get_cell(2, 0).token == "bQ"
     assert board.get_cell(1, 1) is None
+
+
+def test_promoted_queen_can_move_as_queen():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wQ"
+    game.handle_click(150, 50)   # select promoted queen
+    game.handle_click(50, 50)    # queen diagonal move to (0, 0)
+    finish_move(game)
+    assert board.get_cell(0, 0).token == "wQ"
+    assert board.get_cell(0, 1) is None
 
 
 def test_pawn_cannot_capture_forward_without_diagonal():

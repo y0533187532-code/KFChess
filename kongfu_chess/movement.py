@@ -36,17 +36,48 @@ def is_queen_move(dr, dc):
     return is_rook_move(dr, dc) or is_bishop_move(dr, dc)
 
 
-def is_pawn_move(dr, dc, color, target_piece):
+def pawn_start_row(color, num_rows):
+    return num_rows - 1 if color == "w" else 0
+
+
+def is_promotion_row(row, num_rows):
+    return row == 0 or row == num_rows - 1
+
+
+def is_pawn_move(
+    dr,
+    dc,
+    color,
+    target_piece,
+    board=None,
+    from_row=None,
+    from_col=None,
+    to_col=None,
+):
     """Return True if a pawn of ``color`` can move by (dr, dc) to a cell
     occupied by ``target_piece`` (a Piece or None for an empty cell).
 
-    Exported so unit tests can call it directly without going through
-    MovementRules. Game always goes through MovementRules.is_legal so it
-    stays unaware of which piece types need context and which do not.
+    For a double-step forward from the start row, ``board``, ``from_row``,
+    ``from_col``, and ``to_col`` are required to verify the intermediate
+    cell is empty.
     """
     forward = -1 if color == "w" else 1
     if dc == 0 and dr == forward:
         return target_piece is None
+    if (
+        dc == 0
+        and dr == 2 * forward
+        and board is not None
+        and from_row is not None
+        and from_col is not None
+        and to_col is not None
+    ):
+        if from_row != pawn_start_row(color, board.num_rows):
+            return False
+        if target_piece is not None:
+            return False
+        inter_row = from_row + forward
+        return board.get_cell(inter_row, to_col) is None
     if abs(dc) == 1 and dr == forward:
         return target_piece is not None and target_piece.color != color
     return False
@@ -101,9 +132,19 @@ JUMPING_PIECE_TYPES = frozenset({"K", "N", "P"})
 def get_move_route(from_row, from_col, to_row, to_col, piece_type):
     """Return the cells a piece passes through while travelling to ``to``.
 
-    For K/N/P the route is just the destination. For sliding pieces (R/B/Q)
-    it is every cell from the first step through the destination, inclusive.
+    For K/N single-step pawns the route is just the destination. For a
+    pawn double-step the route includes the intermediate square and the
+    destination. For sliding pieces (R/B/Q) it is every cell from the
+    first step through the destination, inclusive.
     """
+    if piece_type == PAWN_PIECE_TYPE:
+        dr = to_row - from_row
+        dc = to_col - from_col
+        if abs(dr) == 2 and dc == 0:
+            step_row = (dr > 0) - (dr < 0)
+            return [(from_row + step_row, from_col), (to_row, to_col)]
+        return [(to_row, to_col)]
+
     if piece_type in JUMPING_PIECE_TYPES:
         return [(to_row, to_col)]
 
@@ -156,16 +197,37 @@ class MovementRules:
             sliding_piece_types if sliding_piece_types is not None else DEFAULT_SLIDING_PIECE_TYPES
         )
 
-    def is_legal(self, piece_type, dr, dc, color=None, target_piece=None):
+    def is_legal(
+        self,
+        piece_type,
+        dr,
+        dc,
+        color=None,
+        target_piece=None,
+        board=None,
+        from_row=None,
+        from_col=None,
+        to_row=None,
+        to_col=None,
+    ):
         """Return True if the move is legal for piece_type.
 
         For context-free pieces (K, Q, R, B, N) only dr/dc matter.
-        For context-dependent pieces (P) color and target_piece are also
-        used. Game always calls this single method - it never needs to
-        know which piece types need extra context (Encapsulation / SRP).
+        For context-dependent pieces (P) color, target_piece, board, and
+        position are also used. Game always calls this single method - it
+        never needs to know which piece types need extra context.
         """
         if piece_type == PAWN_PIECE_TYPE:
-            return is_pawn_move(dr, dc, color, target_piece)
+            return is_pawn_move(
+                dr,
+                dc,
+                color,
+                target_piece,
+                board=board,
+                from_row=from_row,
+                from_col=from_col,
+                to_col=to_col,
+            )
         rule = self._rules.get(piece_type)
         return rule is not None and rule(dr, dc)
 

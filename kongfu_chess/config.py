@@ -32,6 +32,9 @@ PAWN_PIECE_TYPE = "P"
 # Piece type letter for the king - used by Game to detect game-over on capture.
 KING_PIECE_TYPE = "K"
 
+# Piece type letter a pawn promotes to on the last row.
+QUEEN_PIECE_TYPE = "Q"
+
 # --- Click protocol: pixel <-> cell geometry ---
 # A single source of truth for cell size, so it's never repeated (DRY) and
 # never buried as a magic number inside click-handling logic.
