@@ -5,20 +5,31 @@ passing - and how that changes selection/board state. It never touches the
 raw board grid directly (encapsulation): it moves pieces only through the
 Board's own public API (``get_cell`` / ``in_bounds`` / ``move_piece``).
 
-This iteration only wires "click -> select or move" together. Cooldown and
-real travel-time-before-the-piece-arrives (see the requirements doc,
-sections 2.1/2.2) are *not* implemented yet - ``handle_wait`` is a
-deliberate no-op hook for now, kept here (rather than left out entirely) so
-the future real-time engine has an obvious, single place to plug into
-without CommandRunner or main.py needing to change.
+This iteration adds move legality: a click that would move the selected
+piece is only actually applied if ``MovementRules`` says the shape is
+legal for that piece type; an illegal-shaped move just clears the
+selection, same as before. ``movement_rules`` is a constructor parameter
+(defaulting to the standard rule-set), the same pattern Board already
+uses for ``valid_colors``/``valid_piece_types`` - a future "design your
+own game" feature can hand Game a custom ``MovementRules`` instance
+without any change here.
+
+Cooldown and real travel-time-before-the-piece-arrives (see the
+requirements doc, sections 2.1/2.2) are *not* implemented yet -
+``handle_wait`` is a deliberate no-op hook for now, kept here (rather
+than left out entirely) so the future real-time engine has an obvious,
+single place to plug into without CommandRunner or main.py needing to
+change.
 """
 
 from .config import CELL_SIZE_PX
+from .movement import MovementRules
 
 
 class Game:
-    def __init__(self, board):
+    def __init__(self, board, movement_rules=None):
         self._board = board
+        self._movement_rules = movement_rules or MovementRules()
         self._selected = None  # None, or a (row, col) tuple
 
     def handle_click(self, pixel_x, pixel_y):
@@ -29,7 +40,9 @@ class Game:
         - Clicking an empty cell with nothing selected is ignored.
         - Clicking another friendly piece while one is selected replaces
           the selection.
-        - Otherwise, the selected piece moves to the clicked cell.
+        - Otherwise, a move is attempted: it is applied only if it is a
+          legal shape for the selected piece's type, and the selection is
+          cleared either way.
         """
         row, col = self._pixel_to_cell(pixel_x, pixel_y)
         if not self._board.in_bounds(row, col):
@@ -45,7 +58,7 @@ class Game:
         if clicked_piece is not None and clicked_piece.color == self._selected_piece.color:
             self._selected = (row, col)
         else:
-            self._move_selected_to(row, col)
+            self._attempt_move_to(row, col)
 
     def handle_wait(self, milliseconds):
         """Advance the game clock by ``milliseconds``.
@@ -59,9 +72,14 @@ class Game:
         row, col = self._selected
         return self._board.get_cell(row, col)
 
-    def _move_selected_to(self, row, col):
+    def _attempt_move_to(self, row, col):
         from_row, from_col = self._selected
-        self._board.move_piece(from_row, from_col, row, col)
+        piece = self._selected_piece
+        dr, dc = row - from_row, col - from_col
+
+        if self._movement_rules.is_legal(piece.piece_type, dr, dc):
+            self._board.move_piece(from_row, from_col, row, col)
+
         self._selected = None
 
     def _pixel_to_cell(self, pixel_x, pixel_y):

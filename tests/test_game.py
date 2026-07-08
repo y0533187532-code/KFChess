@@ -53,6 +53,82 @@ def test_click_on_another_friendly_piece_replaces_the_selection():
     assert board.get_cell(0, 2).token == "wQ"
 
 
+def test_rook_move_in_a_straight_line_is_legal():
+    board, game = make_game([["wR", ".", "."]])
+    game.handle_click(50, 50)
+    game.handle_click(250, 50)  # two cells over on the same row
+    assert board.get_cell(0, 0) is None
+    assert board.get_cell(0, 2).token == "wR"
+
+
+def test_rook_move_diagonally_is_illegal_and_ignored():
+    rows = [["wR", ".", "."], [".", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)  # select rook at (0, 0)
+    game.handle_click(250, 250)  # diagonal to (2, 2) - illegal shape for a rook
+
+    assert board.get_cell(0, 0).token == "wR"  # never moved
+    assert board.get_cell(2, 2) is None
+
+
+def test_king_moving_two_cells_is_illegal_and_ignored():
+    board, game = make_game([["wK", ".", "."]])
+    game.handle_click(50, 50)
+    game.handle_click(250, 50)  # two cells over - illegal for a king
+
+    assert board.get_cell(0, 0).token == "wK"
+    assert board.get_cell(0, 2) is None
+
+
+def test_bishop_diagonal_move_is_legal():
+    rows = [["wB", ".", "."], [".", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)
+    game.handle_click(250, 250)  # (2, 2) - diagonal
+    assert board.get_cell(2, 2).token == "wB"
+
+
+def test_knight_l_shaped_move_is_legal():
+    rows = [["wN", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)
+    game.handle_click(250, 150)  # (1, 2) - L shape
+    assert board.get_cell(1, 2).token == "wN"
+
+
+def test_queen_diagonal_and_straight_moves_are_both_legal():
+    rows = [["wQ", ".", "."], [".", ".", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)
+    game.handle_click(50, 250)  # straight down (2, 0)
+    assert board.get_cell(2, 0).token == "wQ"
+
+
+def test_unsupported_piece_type_move_is_ignored_not_crashed():
+    # Pawn ("P") has no registered movement rule yet - must be treated as
+    # an illegal move (ignored), never raise.
+    board, game = make_game([["wP", ".", "."]])
+    game.handle_click(50, 50)
+    game.handle_click(150, 50)
+    assert board.get_cell(0, 0).token == "wP"
+    assert board.get_cell(0, 1) is None
+
+
+def test_game_accepts_custom_movement_rules_for_future_custom_games():
+    from kongfu_chess.movement import MovementRules
+
+    rules = MovementRules()
+    rules.register("D", lambda dr, dc: max(abs(dr), abs(dc)) <= 2)
+
+    rows = [["wD", ".", ".", "."], [".", ".", ".", "."], [".", ".", ".", "."]]
+    board = Board(rows, valid_piece_types={"D"})
+    game = Game(board, movement_rules=rules)
+
+    game.handle_click(50, 50)
+    game.handle_click(50, 250)  # 2 cells down - legal for the custom "D" rule
+    assert board.get_cell(2, 0).token == "wD"
+
+
 def test_handle_wait_is_a_no_op_hook_for_now():
     board, game = make_game([["wK"]])
     game.handle_wait(500)
