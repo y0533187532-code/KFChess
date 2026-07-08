@@ -80,3 +80,28 @@ def test_render_rows_normalizes_raw_input_regardless_of_original_spacing():
     # spaced - the output is always single-space separated.
     board = Board([["wK", "wQ", "."]])
     assert board.render_rows() == ["wK wQ ."]
+def test_in_bounds_true_for_a_real_cell():
+    board = Board([["wK", "."], [".", "bK"]])
+    assert board.in_bounds(0, 0) is True
+    assert board.in_bounds(1, 1) is True
+
+
+def test_in_bounds_false_outside_the_grid():
+    board = Board([["wK", "."], [".", "bK"]])
+    assert board.in_bounds(-1, 0) is False
+    assert board.in_bounds(0, -1) is False
+    assert board.in_bounds(2, 0) is False
+    assert board.in_bounds(0, 2) is False
+
+
+def test_move_piece_relocates_piece_and_empties_source_cell():
+    board = Board([["wK", "."], [".", "bK"]])
+    board.move_piece(0, 0, 0, 1)
+    assert board.get_cell(0, 0) is None
+    assert board.get_cell(0, 1).token == "wK"
+
+
+def test_move_piece_onto_occupied_cell_captures_it():
+    board = Board([["wK", "bQ"]])
+    board.move_piece(0, 0, 0, 1)
+    assert board.get_cell(0, 1).token == "wK"

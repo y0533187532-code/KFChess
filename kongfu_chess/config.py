@@ -25,6 +25,18 @@ TOKEN_LENGTH = 2  # e.g. "wP" = color + piece type
 DEFAULT_VALID_PIECE_TYPES = frozenset({"K", "Q", "R", "B", "N", "P"})
 DEFAULT_VALID_COLORS = frozenset({"w", "b"})
 
+# --- Click protocol: pixel <-> cell geometry ---
+# A single source of truth for cell size, so it's never repeated (DRY) and
+# never buried as a magic number inside click-handling logic.
+CELL_SIZE_PX = 100
+
+# --- Text commands understood by the CommandRunner ---
+# Kept out of business logic (SRP / no hardcoded strings) so the protocol
+# vocabulary lives in one place, same spirit as the section headers above.
+CLICK_COMMAND = "click"
+WAIT_COMMAND = "wait"
+PRINT_COMMAND = "print"
+PRINT_BOARD_ARGUMENT = "board"
 
 class ErrorCode:
     """String codes reported to the caller on parsing failures."""

@@ -64,7 +64,27 @@ class Board:
     def get_cell(self, row, col):
         """Return the Piece at (row, col), or None if the cell is empty."""
         return self._cells[row][col]
+    def in_bounds(self, row, col):
+        """Return True if (row, col) is a real cell on this board.
 
+        Centralizing this check here (rather than each caller re-deriving
+        it from num_rows/num_cols) keeps the board's own dimensions as the
+        single source of truth for what counts as "on the board".
+        """
+        return 0 <= row < self.num_rows and 0 <= col < self.num_cols
+
+    def move_piece(self, from_row, from_col, to_row, to_col):
+        """Move whatever occupies (from_row, from_col) to (to_row, to_col).
+
+        The destination is simply overwritten (a capture), and the source
+        cell becomes empty. This is the only place outside __init__ that
+        writes to ``self._cells`` - callers never touch the grid directly,
+        which is exactly what keeps a future binary/compact representation
+        a purely internal change to this class.
+        """
+        piece = self._cells[from_row][from_col]
+        self._cells[to_row][to_col] = piece
+        self._cells[from_row][from_col] = None
     def render_rows(self):
         """Return the board as a list of canonical row strings.
 
