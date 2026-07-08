@@ -25,6 +25,7 @@ def test_run_replays_click_commands_from_the_commands_section():
         "Board:\nwK .\n. bK\nCommands:\n"
         "click 50 50\n"
         "click 150 150\n"
+        "wait 1000\n"
         "print board\n"
     )
     stdout = io.StringIO()

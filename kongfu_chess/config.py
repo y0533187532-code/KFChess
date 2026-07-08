@@ -42,6 +42,17 @@ WAIT_COMMAND = "wait"
 PRINT_COMMAND = "print"
 PRINT_BOARD_ARGUMENT = "board"
 
+# --- Real-time move travel durations (milliseconds per piece type) ---
+# Injectable via Game(move_durations=...) for custom games.
+DEFAULT_MOVE_DURATION_MS = {
+    "K": 1000,
+    "Q": 1000,
+    "R": 1000,
+    "B": 1000,
+    "N": 1000,
+    "P": 1000,
+}
+
 class ErrorCode:
     """String codes reported to the caller on parsing failures."""
     EMPTY_BOARD = "EMPTY_BOARD"

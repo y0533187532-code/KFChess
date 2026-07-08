@@ -3,13 +3,16 @@ import pytest
 from kongfu_chess.board import Board
 from kongfu_chess.movement import (
     MovementRules,
+    get_move_route,
     is_bishop_move,
     is_king_move,
     is_knight_move,
     is_path_clear,
     is_pawn_move,
     is_queen_move,
+    is_route_conflict,
     is_rook_move,
+    is_swap_route,
 )
 
 
@@ -185,3 +188,47 @@ def test_movement_rules_is_legal_delegates_to_pawn_correctly():
     assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is True
     assert rules.is_legal("P", -1, 1, color="w", target_piece=enemy) is True
     assert rules.is_legal("P", -2, 0, color="w", target_piece=None) is False
+
+
+# --- Move route and conflict detection ---
+
+def test_get_move_route_for_rook_includes_intermediate_cells():
+    assert get_move_route(0, 0, 0, 3, "R") == [(0, 1), (0, 2), (0, 3)]
+
+
+def test_get_move_route_for_knight_is_destination_only():
+    assert get_move_route(0, 0, 1, 2, "N") == [(1, 2)]
+
+
+def test_is_swap_route_true_for_enemy_swapping_endpoints():
+    assert is_swap_route((0, 0), (0, 2), "w", (0, 2), (0, 0), "b") is True
+
+
+def test_is_swap_route_false_for_same_color():
+    assert is_swap_route((0, 0), (0, 1), "w", (0, 1), (0, 0), "w") is False
+
+
+def test_is_route_conflict_when_routes_overlap():
+    existing_route = [(0, 1), (0, 2)]
+    new_route = [(0, 2), (0, 3)]
+    assert is_route_conflict(
+        (0, 0), (0, 2), existing_route,
+        (0, 4), (0, 2), new_route,
+        "w", "b",
+    ) is True
+
+
+def test_is_route_conflict_when_landing_on_active_origin():
+    assert is_route_conflict(
+        (0, 0), (0, 2), [(0, 1), (0, 2)],
+        (0, 4), (0, 0), [(0, 0)],
+        "w", "b",
+    ) is True
+
+
+def test_is_route_conflict_false_for_enemy_swap():
+    assert is_route_conflict(
+        (0, 0), (0, 2), [(0, 1), (0, 2)],
+        (0, 2), (0, 0), [(0, 1), (0, 0)],
+        "w", "b",
+    ) is False

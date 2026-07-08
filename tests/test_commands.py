@@ -20,7 +20,7 @@ def test_blank_lines_are_ignored():
 
 def test_click_command_is_dispatched_to_the_game():
     board, runner, stdout = make_runner([["wK", "."]])
-    runner.run(["click 50 50", "click 150 50"])
+    runner.run(["click 50 50", "click 150 50", "wait 1000"])
     assert board.get_cell(0, 0) is None
     assert board.get_cell(0, 1).token == "wK"
 
@@ -56,6 +56,7 @@ def test_full_command_sequence_end_to_end():
             "click 50 50",
             "wait 100",
             "click 150 50",
+            "wait 1000",
             "print board",
         ]
     )
