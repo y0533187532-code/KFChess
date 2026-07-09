@@ -314,3 +314,27 @@ def test_is_route_conflict_false_when_either_move_is_a_jump():
         "w", "b",
         new_jump=True,
     ) is False
+
+
+def test_is_route_conflict_when_opposite_colors_share_a_column_on_parallel_rows():
+    assert is_route_conflict(
+        (0, 0), (0, 2), [(0, 1), (0, 2)],
+        (2, 0), (2, 2), [(2, 1), (2, 2)],
+        "w", "b",
+    ) is True
+
+
+def test_is_route_conflict_false_for_opposite_colors_on_same_row_adjacent():
+    assert is_route_conflict(
+        (0, 0), (0, 1), [(0, 1)],
+        (0, 3), (0, 2), [(0, 2)],
+        "w", "b",
+    ) is False
+
+
+def test_is_route_conflict_false_for_same_color_parallel_routes():
+    assert is_route_conflict(
+        (0, 0), (0, 2), [(0, 1), (0, 2)],
+        (2, 0), (2, 2), [(2, 1), (2, 2)],
+        "w", "w",
+    ) is False

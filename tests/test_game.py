@@ -10,8 +10,12 @@ def make_game(rows):
     return board, Game(board)
 
 
-def finish_move(game, ms=FULL_MOVE_WAIT_MS):
-    game.handle_wait(ms)
+def finish_move(game, ms=None):
+    if ms is not None:
+        game.handle_wait(ms)
+        return
+    while game._active_moves:
+        game.handle_wait(FULL_MOVE_WAIT_MS)
 
 
 def test_click_outside_the_board_is_ignored():
@@ -289,6 +293,31 @@ def test_partial_wait_does_not_complete_move():
     assert board.get_cell(0, 1).token == "wK"
 
 
+def test_two_cell_move_duration_scales_with_route_length():
+    board, game = make_game([["wR", ".", "."]])
+    game.handle_click(50, 50)
+    game.handle_click(250, 50)
+    game.handle_wait(1000)
+    assert board.get_cell(0, 0).token == "wR"
+    assert board.get_cell(0, 2) is None
+    game.handle_wait(1000)
+    assert board.get_cell(0, 0) is None
+    assert board.get_cell(0, 2).token == "wR"
+
+
+def test_opposite_colors_cannot_queue_parallel_moves_in_common_route():
+    rows = [["wR", ".", "."], [".", ".", "."], ["bR", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(50, 50)
+    game.handle_click(250, 50)
+    game.handle_click(50, 250)
+    game.handle_click(250, 250)
+    finish_move(game, ms=2000)
+    assert board.get_cell(0, 2).token == "wR"
+    assert board.get_cell(2, 0).token == "bR"
+    assert board.get_cell(2, 2) is None
+
+
 def test_piece_can_move_again_immediately_after_arrival():
     board, game = make_game([["wK", ".", "."]])
     game.handle_click(50, 50)
@@ -525,15 +554,15 @@ def test_moving_piece_cannot_jump():
 
 
 def test_enemy_arriving_at_airborne_cell_is_captured():
-    rows = [["wK", ".", "bR"]]
+    rows = [["wK", "bR", "."]]
     board, game = make_game(rows)
     game.handle_click(50, 50)    # select wK at (0, 0)
     game.handle_click(50, 50)    # jump at (0, 0)
-    game.handle_click(250, 50)   # select bR at (0, 2)
+    game.handle_click(150, 50)   # select bR at (0, 1)
     game.handle_click(50, 50)    # bR moves to (0, 0)
     finish_move(game, ms=DEFAULT_JUMP_DURATION_MS)
     assert board.get_cell(0, 0).token == "wK"
-    assert board.get_cell(0, 2) is None
+    assert board.get_cell(0, 1) is None
 
 
 def test_jump_allowed_while_enemy_en_route_to_same_cell():

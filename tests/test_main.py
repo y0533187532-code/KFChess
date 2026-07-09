@@ -73,3 +73,23 @@ def test_main_prints_error_and_exits_nonzero_for_invalid_input():
 
     assert excinfo.value.code == 1
     assert stdout.getvalue().strip() == "ERROR UNKNOWN_TOKEN"
+
+
+def test_main_handles_leading_whitespace_on_board_header():
+    raw_text = (
+        " Board:\n"
+        "wK . .\n"
+        ". . .\n"
+        ". . .\n"
+        "Commands:\n"
+        "click 50 50\n"
+        "click 150 150\n"
+        "wait 1000\n"
+        "print board\n"
+    )
+    stdin = io.StringIO(raw_text)
+    stdout = io.StringIO()
+
+    main(stdin=stdin, stdout=stdout)
+
+    assert stdout.getvalue().splitlines() == [". . .", ". wK .", ". . ."]

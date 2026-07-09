@@ -38,3 +38,17 @@ def test_custom_headers_are_honoured():
     board_rows, command_lines = parser.parse(raw_text)
     assert board_rows == [["wK"]]
     assert command_lines == ["E4"]
+
+
+def test_parses_board_header_with_leading_whitespace():
+    raw_text = " Board:\nwK .\nCommands:\n"
+    board_rows, command_lines = InputParser().parse(raw_text)
+    assert board_rows == [["wK", "."]]
+    assert command_lines == []
+
+
+def test_skips_blank_lines_in_board_section():
+    raw_text = "Board:\n\nwK .\n\n. bK\nCommands:\n"
+    board_rows, command_lines = InputParser().parse(raw_text)
+    assert board_rows == [["wK", "."], [".", "bK"]]
+    assert command_lines == []
