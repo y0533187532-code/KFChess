@@ -84,6 +84,26 @@ def test_main_prints_error_for_invalid_promotion_type():
     assert stdout.getvalue().strip() == "ERROR INVALID_PROMOTION_TYPE"
 
 
+def test_main_prints_error_for_missing_promotion_choice():
+    from kongfu_chess.errors import MissingPromotionChoiceError
+    import main as main_module
+
+    stdin = io.StringIO("")
+    stdout = io.StringIO()
+
+    original_run = main_module.run
+    main_module.run = lambda _text, _out: (_ for _ in ()).throw(
+        MissingPromotionChoiceError()
+    )
+    try:
+        with pytest.raises(SystemExit) as excinfo:
+            main(stdin=stdin, stdout=stdout)
+        assert excinfo.value.code == 1
+        assert stdout.getvalue().strip() == "ERROR MISSING_PROMOTION_CHOICE"
+    finally:
+        main_module.run = original_run
+
+
 def test_main_handles_leading_whitespace_on_board_header():
     raw_text = (
         " Board:\n"

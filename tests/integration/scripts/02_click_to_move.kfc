@@ -1,0 +1,21 @@
+# Click-select and move king one square through the public command path.
+# Two clicks (select + destination); board unchanged before arrival, updated after.
+
+Board:
+wK . .
+. . .
+. . .
+Commands:
+click 50 50
+click 150 150
+print board
+Expect:
+wK . .
+. . .
+. . .
+wait 1000
+print board
+Expect:
+. . .
+. wK .
+. . .

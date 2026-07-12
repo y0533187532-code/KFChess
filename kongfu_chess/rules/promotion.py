@@ -2,11 +2,11 @@
 
 try:
     from ..config import DEFAULT_PROMOTION_PIECE_TYPE, PAWN_PIECE_TYPE
-    from ..errors import InvalidPromotionTypeError
+    from ..errors import InvalidPromotionTypeError, MissingPromotionChoiceError
     from .pawn import is_promotion_row
 except ImportError:
     from config import DEFAULT_PROMOTION_PIECE_TYPE, PAWN_PIECE_TYPE
-    from errors import InvalidPromotionTypeError
+    from errors import InvalidPromotionTypeError, MissingPromotionChoiceError
     from pawn import is_promotion_row
 
 
@@ -35,6 +35,9 @@ def resolve_promotion_piece_type(
         return None
 
     if chosen_type is None:
-        return DEFAULT_PROMOTION_PIECE_TYPE
+        allowed = piece_rules.allowed_promotion_types()
+        if DEFAULT_PROMOTION_PIECE_TYPE in allowed:
+            return DEFAULT_PROMOTION_PIECE_TYPE
+        raise MissingPromotionChoiceError()
 
     return validate_promotion_piece_type(chosen_type, piece_rules)

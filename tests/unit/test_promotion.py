@@ -1,6 +1,8 @@
+import io
+
 import pytest
 
-from kongfu_chess.errors import InvalidPromotionTypeError
+from kongfu_chess.errors import InvalidPromotionTypeError, MissingPromotionChoiceError
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.piece import Piece
 from kongfu_chess.rules import (
@@ -9,6 +11,7 @@ from kongfu_chess.rules import (
     validate_promotion_piece_type,
 )
 from kongfu_chess.game import Game
+from kongfu_chess.texttests.script_runner import ScriptRunner
 
 
 @pytest.fixture
@@ -66,6 +69,20 @@ def test_resolve_promotion_defaults_to_queen_without_choice(piece_rules):
     assert resolve_promotion_piece_type(pawn, 0, 3, piece_rules) == "Q"
 
 
+def test_resolve_promotion_raises_when_no_choice_and_queen_not_allowed():
+    rules = PieceRules(promotable_piece_types={"R"})
+    pawn = Piece(color="w", piece_type="P", piece_id=1)
+    with pytest.raises(MissingPromotionChoiceError) as excinfo:
+        resolve_promotion_piece_type(pawn, 0, 3, rules)
+    assert excinfo.value.code == "MISSING_PROMOTION_CHOICE"
+
+
+def test_resolve_promotion_uses_explicit_choice_when_queen_not_allowed():
+    rules = PieceRules(promotable_piece_types={"R"})
+    pawn = Piece(color="w", piece_type="P", piece_id=1)
+    assert resolve_promotion_piece_type(pawn, 0, 3, rules, chosen_type="R") == "R"
+
+
 def test_resolve_promotion_uses_explicit_choice(piece_rules):
     pawn = Piece(color="w", piece_type="P", piece_id=1)
     assert resolve_promotion_piece_type(pawn, 0, 3, piece_rules, chosen_type="R") == "R"
@@ -103,3 +120,38 @@ def test_registered_custom_piece_promotes_end_to_end():
     game.handle_click(150, 50)
     game.handle_wait(1000)
     assert board.get_cell(0, 1).token == "wD"
+
+
+def test_pawn_promotion_without_choice_raises_when_queen_not_allowed():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    rules = PieceRules(promotable_piece_types={"R"})
+    game = Game(board, piece_rules=rules)
+    game.handle_click(150, 150)
+    game.handle_click(150, 50)
+    with pytest.raises(MissingPromotionChoiceError):
+        game.handle_wait(1000)
+
+
+def test_pawn_promotion_with_explicit_choice_when_queen_not_allowed():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    rules = PieceRules(promotable_piece_types={"R"})
+    game = Game(board, piece_rules=rules)
+    game.handle_click(150, 150)
+    game.handle_promote("R")
+    game.handle_click(150, 50)
+    game.handle_wait(1000)
+    assert board.get_cell(0, 1).token == "wR"
+
+
+def test_script_runner_raises_when_promotion_choice_missing():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    rules = PieceRules(promotable_piece_types={"R"})
+    game = Game(board, piece_rules=rules)
+    stdout = io.StringIO()
+    with pytest.raises(MissingPromotionChoiceError):
+        ScriptRunner(game, board, stdout).run(
+            ["click 150 150", "click 150 50", "wait 1000"]
+        )

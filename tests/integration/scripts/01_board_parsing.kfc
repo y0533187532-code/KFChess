@@ -1,0 +1,12 @@
+# Board parsing — logical board matches text setup.
+
+Board:
+. . .
+. wK .
+. . .
+Commands:
+print board
+Expect:
+. . .
+. wK .
+. . .

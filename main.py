@@ -15,7 +15,11 @@ call it with any string, with no need to monkeypatch sys.stdin.
 import sys
 
 from kongfu_chess.app import run
-from kongfu_chess.errors import BoardParsingError, InvalidPromotionTypeError
+from kongfu_chess.errors import (
+    BoardParsingError,
+    InvalidPromotionTypeError,
+    MissingPromotionChoiceError,
+)
 
 __all__ = ["main", "run"]
 
@@ -36,6 +40,9 @@ def main(stdin=None, stdout=None):
         print(f"ERROR {error.code}", file=stdout)
         sys.exit(1)
     except InvalidPromotionTypeError as error:
+        print(f"ERROR {error.code}", file=stdout)
+        sys.exit(1)
+    except MissingPromotionChoiceError as error:
         print(f"ERROR {error.code}", file=stdout)
         sys.exit(1)
 

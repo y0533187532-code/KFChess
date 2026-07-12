@@ -1,0 +1,32 @@
+# Rook real-time move: logical board unchanged before arrival, updated after.
+# Two clicks (select + destination); three print-board checkpoints prove movement.
+
+Board:
+. wR .
+. . .
+. . bK
+Commands:
+print board
+Expect:
+. wR .
+. . .
+. . bK
+click 150 50
+click 150 250
+print board
+Expect:
+. wR .
+. . .
+. . bK
+wait 1000
+print board
+Expect:
+. wR .
+. . .
+. . bK
+wait 1000
+print board
+Expect:
+. . .
+. . .
+. wR bK

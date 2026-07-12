@@ -6,11 +6,11 @@ how the course grader invokes the program.
 
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from tests.conftest import PROJECT_ROOT
+
 MAIN_PY = PROJECT_ROOT / "main.py"
 
 
