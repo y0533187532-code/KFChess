@@ -1,8 +1,18 @@
 """Deterministic virtual-time resolution for in-flight motions."""
 
 try:
+    from .airborne_jump import (
+        collect_airborne_jumps,
+        is_captured_by_airborne_jump,
+        is_jump_motion,
+    )
     from .motion import make_jump_motion, make_travel_motion
 except ImportError:
+    from airborne_jump import (
+        collect_airborne_jumps,
+        is_captured_by_airborne_jump,
+        is_jump_motion,
+    )
     from motion import make_jump_motion, make_travel_motion
 
 
@@ -63,18 +73,13 @@ class RealTimeArbiter:
 
             group = finished[index:group_end]
             group_moves = [entry["move"] for entry in group]
-            airborne_jumps = [
-                jump_move
-                for jump_move in self._active_moves
-                if jump_move.get("jump")
-                and (jump_move in group_moves or jump_move["remaining"] > 0)
-            ]
+            airborne_jumps = collect_airborne_jumps(group_moves, self._active_moves)
 
             for entry in group:
                 move = entry["move"]
-                if move not in self._active_moves or move.get("jump"):
+                if move not in self._active_moves or is_jump_motion(move):
                     continue
-                if self._executor.is_captured_by_airborne_jump(move, airborne_jumps):
+                if is_captured_by_airborne_jump(move, airborne_jumps):
                     from_row, from_col = move["from"]
                     self._executor.clear_source_cell(from_row, from_col)
                     self._remove_active_move(move)
@@ -85,8 +90,8 @@ class RealTimeArbiter:
                 if move not in self._active_moves:
                     continue
 
-                if move.get("jump"):
-                    self._remove_active_move(move)
+                if is_jump_motion(move):
+                    self._complete_jump(move)
                     completed.append(move)
                     continue
 
@@ -99,6 +104,10 @@ class RealTimeArbiter:
                 completed.append(move)
 
             index = group_end
+
+    def _complete_jump(self, move):
+        """End an airborne jump; logical board occupancy is unchanged."""
+        self._remove_active_move(move)
 
     def _remove_active_move(self, move):
         while move in self._active_moves:

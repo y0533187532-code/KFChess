@@ -85,7 +85,13 @@ def main():
 
     realtime_out = OUT / "realtime"
     realtime_out.mkdir()
-    for name in ("__init__.py", "motion.py", "real_time_arbiter.py", "arrival_resolver.py"):
+    for name in (
+        "__init__.py",
+        "motion.py",
+        "real_time_arbiter.py",
+        "arrival_resolver.py",
+        "airborne_jump.py",
+    ):
         shutil.copy2(PKG / "realtime" / name, realtime_out / name)
 
     input_out = OUT / "input"

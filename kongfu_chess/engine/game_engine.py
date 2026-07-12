@@ -3,7 +3,11 @@
 Parallel movement policy (conflict #1): multiple pieces may travel at once.
 There is no global ``motion_in_progress`` guard — new moves start while others
 are in flight unless ``is_route_conflict`` rejects the request. Arrival order,
-swap cancellation, and airborne capture are resolved by RealTimeArbiter.
+swap cancellation, and airborne jump capture are resolved by RealTimeArbiter.
+
+Airborne jump (conflict #4): same-cell re-click or ``jump`` command schedules
+a jump via ``RealTimeArbiter.schedule_jump``; capture-on-arrival to an airborne
+cell is handled in ``realtime.airborne_jump``.
 """
 
 try:
@@ -217,14 +221,6 @@ class GameEngine:
                 return False
 
         return True
-
-    def is_captured_by_airborne_jump(self, move, airborne_jumps):
-        to_row, to_col = move["to"]
-        return any(
-            jump_move["from"] == (to_row, to_col)
-            and jump_move["color"] != move["color"]
-            for jump_move in airborne_jumps
-        )
 
     def _resolve_promotion(self, moving, to_row):
         chosen_type = self._state.consume_promotion_choice()

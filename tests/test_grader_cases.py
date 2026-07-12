@@ -344,3 +344,19 @@ def test_grader_king_capture_ends_game_and_blocks_further_moves():
         "print board\n",
         [". . wR", ". . wN", ". . .", ". . wR", ". . wN", ". . ."],
     )
+
+
+def test_grader_invalid_slide_leaves_board_unchanged_after_wait():
+    """DOCX Iteration 8 — blocked slide, board unchanged after wait."""
+    assert_output(
+        " Board:\n"
+        "wR wP .\n"
+        ". . .\n"
+        ". . bK\n"
+        "Commands:\n"
+        "click 50 50\n"
+        "click 250 50\n"
+        "wait 3000\n"
+        "print board\n",
+        ["wR wP .", ". . .", ". . bK"],
+    )
