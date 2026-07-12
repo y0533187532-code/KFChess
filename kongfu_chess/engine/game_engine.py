@@ -14,6 +14,7 @@ try:
     )
     from ..engine.types import GameSnapshot, MoveResult
     from ..realtime import RealTimeArbiter
+    from ..realtime.arrival_resolver import apply_arrival
     from ..rules import (
         RuleEngine,
         get_move_route,
@@ -29,6 +30,7 @@ except ImportError:
     )
     from engine.types import GameSnapshot, MoveResult
     from realtime import RealTimeArbiter
+    from realtime.arrival_resolver import apply_arrival
     from rules import (
         RuleEngine,
         get_move_route,
@@ -188,13 +190,19 @@ class GameEngine:
     def execute_move(self, move):
         from_row, from_col = move["from"]
         to_row, to_col = move["to"]
-        captured = self._board.get_cell(to_row, to_col)
         moving = self._board.get_cell(from_row, from_col)
         promotion = self._resolve_promotion(moving, to_row)
-        self._board.move_piece(
-            from_row, from_col, to_row, to_col, promotion_piece_type=promotion
+        result = apply_arrival(
+            self._board,
+            from_row,
+            from_col,
+            to_row,
+            to_col,
+            move["color"],
+            promotion_piece_type=promotion,
+            game_over_piece_type=self._game_over_piece_type,
         )
-        if self._is_enemy_king_capture(captured, move["color"]):
+        if result.king_captured:
             self._state.mark_game_over()
 
     def can_execute_move(self, move, completed_moves):
@@ -231,13 +239,6 @@ class GameEngine:
             )
         return self._promotion_policy(
             moving, to_row, self._board.num_rows, chosen_type=chosen_type
-        )
-
-    def _is_enemy_king_capture(self, captured_piece, moving_color):
-        return (
-            captured_piece is not None
-            and captured_piece.piece_type == self._game_over_piece_type
-            and captured_piece.color != moving_color
         )
 
     def _is_swap_with_lower_order(self, move, other):

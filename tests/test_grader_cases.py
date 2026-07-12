@@ -324,3 +324,23 @@ def test_grader_28_opposite_colors_do_not_move_concurrently_in_common_route():
         "print board\n",
         [". . wR", ". . .", "bR . ."],
     )
+
+
+def test_grader_king_capture_ends_game_and_blocks_further_moves():
+    """DOCX Iteration 6 — capture on arrival, king capture game-over."""
+    assert_output(
+        " Board:\n"
+        "wR . bK\n"
+        ". . wN\n"
+        ". . .\n"
+        "Commands:\n"
+        "click 50 50\n"
+        "click 250 50\n"
+        "wait 2000\n"
+        "print board\n"
+        "click 250 150\n"
+        "click 50 250\n"
+        "wait 2000\n"
+        "print board\n",
+        [". . wR", ". . wN", ". . .", ". . wR", ". . wN", ". . ."],
+    )
