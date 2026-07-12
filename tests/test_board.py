@@ -1,6 +1,6 @@
 import pytest
 
-from kongfu_chess.board import Board
+from kongfu_chess.model.board import Board
 from kongfu_chess.errors import (
     EmptyBoardError,
     RowWidthMismatchError,

@@ -1,4 +1,4 @@
-from kongfu_chess.board import Board
+from kongfu_chess.model.board import Board
 from kongfu_chess.config import DEFAULT_JUMP_DURATION_MS, DEFAULT_MOVE_DURATION_MS
 from kongfu_chess.game import Game
 

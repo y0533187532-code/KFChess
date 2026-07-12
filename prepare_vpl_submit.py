@@ -8,15 +8,16 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+PKG = ROOT / "kongfu_chess"
 OUT = ROOT / "vpl_submit"
 
 FLAT_FILES = [
-    "config.py",
-    "errors.py",
-    "piece.py",
-    "board.py",
-    "commands.py",
-    "game.py",
+    ("config.py", PKG / "config.py"),
+    ("errors.py", PKG / "errors.py"),
+    ("piece.py", PKG / "model" / "piece.py"),
+    ("board.py", PKG / "model" / "board.py"),
+    ("commands.py", PKG / "texttests" / "script_runner.py"),
+    ("game.py", PKG / "game.py"),
 ]
 
 MOVEMENT_FILES = [
@@ -28,21 +29,52 @@ MOVEMENT_FILES = [
     "shapes.py",
 ]
 
+PARSER_MAIN = '''\
+if __name__ == "__main__":
+    import sys
+
+    try:
+        from .board import Board
+        from .commands import ScriptRunner
+        from .errors import BoardParsingError
+        from .game import Game
+    except ImportError:
+        from board import Board
+        from commands import ScriptRunner
+        from errors import BoardParsingError
+        from game import Game
+
+    _stdin = sys.stdin
+    _stdout = sys.stdout
+    _raw_text = _stdin.read()
+    try:
+        _parser = InputParser()
+        _board_rows, _command_lines = _parser.parse(_raw_text)
+        _board = Board(_board_rows)
+        _game = Game(_board)
+        ScriptRunner(_game, _board, _stdout).run(_command_lines)
+    except BoardParsingError as _error:
+        print(f"ERROR {_error.code}", file=_stdout)
+        sys.exit(1)
+'''
+
 
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir()
 
-    shutil.copy2(ROOT / "kongfu_chess" / "parser.py", OUT / "parser.py")
+    script_parser = (PKG / "texttests" / "script_parser.py").read_text(encoding="utf-8")
+    parser_body = script_parser.split("class ScriptParser")[0].rstrip()
+    (OUT / "parser.py").write_text(parser_body + "\n\n" + PARSER_MAIN, encoding="utf-8")
 
-    for name in FLAT_FILES:
-        shutil.copy2(ROOT / "kongfu_chess" / name, OUT / name)
+    for dest_name, src_path in FLAT_FILES:
+        shutil.copy2(src_path, OUT / dest_name)
 
     movement_out = OUT / "movement"
     movement_out.mkdir()
     for name in MOVEMENT_FILES:
-        shutil.copy2(ROOT / "kongfu_chess" / "movement" / name, movement_out / name)
+        shutil.copy2(PKG / "movement" / name, movement_out / name)
 
     print(f"Created {OUT}")
     print("Upload these files to VPL:")

@@ -22,8 +22,8 @@ Design notes for two known-but-not-yet-implemented future needs:
 """
 
 try:
-    from .config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
-    from .errors import EmptyBoardError, RowWidthMismatchError, UnknownTokenError
+    from ..config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
+    from ..errors import EmptyBoardError, RowWidthMismatchError, UnknownTokenError
     from .piece import Piece
 except ImportError:
     from config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
@@ -101,6 +101,7 @@ class Board:
             piece = Piece(color=piece.color, piece_type=promotion_piece_type)
         self._cells[to_row][to_col] = piece
         self._cells[from_row][from_col] = None
+
     def render_rows(self):
         """Return the board as a list of canonical row strings.
 

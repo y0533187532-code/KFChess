@@ -1,6 +1,6 @@
 import pytest
 
-from kongfu_chess.board import Board
+from kongfu_chess.model.board import Board
 from kongfu_chess.movement import (
     MovementRules,
     get_move_route,
@@ -173,7 +173,7 @@ def test_white_pawn_double_step_rejected_when_intermediate_blocked():
 
 
 def test_white_pawn_double_step_rejected_when_destination_occupied():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     blocker = Piece(color="b", piece_type="N")
     board = Board([[".", "bN"], [".", "."], [".", "wP"]])
     assert is_pawn_move(
@@ -196,39 +196,39 @@ def test_pawn_forward_direction_is_injectable_via_movement_rules():
 
 
 def test_pawn_cannot_move_forward_to_occupied_cell():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     blocker = Piece(color="b", piece_type="P")
     assert is_pawn_move(-1, 0, "w", blocker) is False
 
 
 def test_white_pawn_captures_diagonally_forward():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     enemy = Piece(color="b", piece_type="N")
     assert is_pawn_move(-1, 1, "w", enemy) is True
     assert is_pawn_move(-1, -1, "w", enemy) is True
 
 
 def test_black_pawn_captures_diagonally_forward():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     enemy = Piece(color="w", piece_type="N")
     assert is_pawn_move(1, 1, "b", enemy) is True
     assert is_pawn_move(1, -1, "b", enemy) is True
 
 
 def test_pawn_cannot_capture_forward_without_diagonal():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     enemy = Piece(color="b", piece_type="N")
     assert is_pawn_move(-1, 0, "w", enemy) is False
 
 
 def test_pawn_cannot_capture_own_color_diagonally():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     friendly = Piece(color="w", piece_type="N")
     assert is_pawn_move(-1, 1, "w", friendly) is False
 
 
 def test_movement_rules_is_legal_delegates_to_pawn_correctly():
-    from kongfu_chess.piece import Piece
+    from kongfu_chess.model.piece import Piece
     rules = MovementRules()
     enemy = Piece(color="b", piece_type="P")
     board = Board([[".", "."], [".", "."], [".", "wP"]])

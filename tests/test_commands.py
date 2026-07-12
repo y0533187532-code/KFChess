@@ -1,7 +1,7 @@
 import io
 
-from kongfu_chess.board import Board
-from kongfu_chess.commands import CommandRunner
+from kongfu_chess.model.board import Board
+from kongfu_chess.texttests.script_runner import ScriptRunner
 from kongfu_chess.game import Game
 
 
@@ -9,7 +9,7 @@ def make_runner(rows):
     board = Board(rows)
     game = Game(board)
     stdout = io.StringIO()
-    return board, CommandRunner(game, board, stdout), stdout
+    return board, ScriptRunner(game, board, stdout), stdout
 
 
 def test_blank_lines_are_ignored():

@@ -13,7 +13,7 @@ class unmodified.
 from dataclasses import dataclass
 
 try:
-    from .config import TOKEN_LENGTH
+    from ..config import TOKEN_LENGTH
 except ImportError:
     from config import TOKEN_LENGTH
 

@@ -1,4 +1,4 @@
-from kongfu_chess.piece import Piece
+from kongfu_chess.model.piece import Piece
 
 
 def test_from_token_builds_piece_with_color_and_type():

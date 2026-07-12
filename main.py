@@ -14,27 +14,10 @@ call it with any string, with no need to monkeypatch sys.stdin.
 
 import sys
 
-from kongfu_chess.board import Board
-from kongfu_chess.commands import CommandRunner
+from kongfu_chess.app import run
 from kongfu_chess.errors import BoardParsingError
-from kongfu_chess.game import Game
-from kongfu_chess.parser import InputParser
 
-
-
-def run(raw_text, stdout, input_parser=None):
-    """Parse raw_text, replay its commands, and return the resulting Board.
-
-    Raises BoardParsingError (see kongfu_chess.errors) on any invalid input.
-    """
-    parser = input_parser or InputParser()
-    board_rows, command_lines = parser.parse(raw_text)
-
-    board = Board(board_rows)
-    game = Game(board)
-    CommandRunner(game, board, stdout).run(command_lines)
-
-    return board
+__all__ = ["main", "run"]
 
 
 def main(stdin=None, stdout=None):
@@ -52,6 +35,7 @@ def main(stdin=None, stdout=None):
     except BoardParsingError as error:
         print(f"ERROR {error.code}", file=stdout)
         sys.exit(1)
+
 
 if __name__ == "__main__":  # pragma: no cover
     main()

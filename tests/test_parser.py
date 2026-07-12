@@ -1,7 +1,7 @@
 import pytest
 
 from kongfu_chess.errors import MissingSectionError
-from kongfu_chess.parser import InputParser
+from kongfu_chess.texttests.script_parser import InputParser
 
 
 def test_parses_board_and_command_lines():

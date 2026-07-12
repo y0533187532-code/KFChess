@@ -1,15 +1,7 @@
-"""Dispatches parsed command lines to a Game, and prints board snapshots.
-
-This is deliberately separate from Game (SRP): Game only knows about
-click/wait game-state transitions, with no idea that its input ever came
-from text lines at all. CommandRunner is the only place that knows the
-*text* shape of "click x y" / "wait ms" / "print board" - if the protocol
-ever changes (e.g. a binary/network protocol instead of text lines), only
-this class needs to change.
-"""
+"""Dispatches parsed command lines to a Game, and prints board snapshots."""
 
 try:
-    from .config import (
+    from ..config import (
         CLICK_COMMAND,
         JUMP_COMMAND,
         PRINT_COMMAND,
@@ -26,7 +18,7 @@ except ImportError:
     )
 
 
-class CommandRunner:
+class ScriptRunner:
     def __init__(self, game, board, stdout):
         self._game = game
         self._board = board
@@ -69,3 +61,6 @@ class CommandRunner:
         if arguments and arguments[0] == PRINT_BOARD_ARGUMENT:
             for row in self._board.render_rows():
                 print(row, file=self._stdout)
+
+
+CommandRunner = ScriptRunner
