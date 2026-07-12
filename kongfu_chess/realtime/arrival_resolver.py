@@ -1,5 +1,7 @@
 """Atomic arrival resolution: capture removal, placement, king-capture detection."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 try:

@@ -360,3 +360,53 @@ def test_grader_invalid_slide_leaves_board_unchanged_after_wait():
         "print board\n",
         ["wR wP .", ". . .", ". . bK"],
     )
+
+
+def test_grader_39_white_pawn_double_from_start_valid():
+    assert_output(
+        " Board:\n"
+        ". . .\n"
+        ". . .\n"
+        ". . .\n"
+        ". wP .\n"
+        ". . .\n"
+        "Commands:\n"
+        "click 150 350\n"
+        "click 150 150\n"
+        "wait 2000\n"
+        "print board\n",
+        [". . .", ". wP .", ". . .", ". . .", ". . ."],
+    )
+
+
+def test_grader_40_black_pawn_double_from_start_valid():
+    assert_output(
+        " Board:\n"
+        ". . .\n"
+        ". bP .\n"
+        ". . .\n"
+        ". . .\n"
+        ". . .\n"
+        "Commands:\n"
+        "click 150 150\n"
+        "click 150 350\n"
+        "wait 2000\n"
+        "print board\n",
+        [". . .", ". . .", ". . .", ". bP .", ". . ."],
+    )
+
+
+def test_grader_42_white_pawn_double_from_non_start_invalid():
+    assert_output(
+        " Board:\n"
+        ". . .\n"
+        ". . .\n"
+        ". . .\n"
+        ". wP .\n"
+        "Commands:\n"
+        "click 150 350\n"
+        "click 150 150\n"
+        "wait 2000\n"
+        "print board\n",
+        [". . .", ". . .", ". . .", ". wP ."],
+    )

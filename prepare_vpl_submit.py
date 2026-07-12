@@ -1,7 +1,7 @@
 """Copy project files into vpl_submit/ for uploading to VPL.
 
-VPL runs parser.py as a script (not as part of a package). Upload the
-entire vpl_submit/ folder contents to VPL, keeping the rules/ subfolder.
+VPL runs main.py at the upload root (not as a package). Upload the entire
+vpl_submit/ folder contents to VPL, keeping the rules/ subfolder.
 """
 
 import shutil
@@ -31,47 +31,46 @@ RULES_FILES = [
     "promotion.py",
 ]
 
-PARSER_MAIN = '''\
+VPL_MAIN = '''\
+"""VPL entry point — flat imports, same behavior as repo root main.py."""
+
+import sys
+
+from board import Board
+from commands import ScriptRunner
+from errors import (
+    BoardParsingError,
+    InvalidPromotionTypeError,
+    MissingPromotionChoiceError,
+)
+from game import Game
+from parser import InputParser
+
+
+def main(stdin=None, stdout=None):
+    stdin = stdin if stdin is not None else sys.stdin
+    stdout = stdout if stdout is not None else sys.stdout
+
+    raw_text = stdin.read()
+    try:
+        parser = InputParser()
+        board_rows, command_lines = parser.parse(raw_text)
+        board = Board(board_rows)
+        game = Game(board)
+        ScriptRunner(game, board, stdout).run(command_lines)
+    except BoardParsingError as error:
+        print(f"ERROR {error.code}", file=stdout)
+        sys.exit(1)
+    except InvalidPromotionTypeError as error:
+        print(f"ERROR {error.code}", file=stdout)
+        sys.exit(1)
+    except MissingPromotionChoiceError as error:
+        print(f"ERROR {error.code}", file=stdout)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    import sys
-
-    try:
-        from .board import Board
-        from .commands import ScriptRunner
-        from .errors import (
-            BoardParsingError,
-            InvalidPromotionTypeError,
-            MissingPromotionChoiceError,
-        )
-        from .game import Game
-    except ImportError:
-        from board import Board
-        from commands import ScriptRunner
-        from errors import (
-            BoardParsingError,
-            InvalidPromotionTypeError,
-            MissingPromotionChoiceError,
-        )
-        from game import Game
-
-    _stdin = sys.stdin
-    _stdout = sys.stdout
-    _raw_text = _stdin.read()
-    try:
-        _parser = InputParser()
-        _board_rows, _command_lines = _parser.parse(_raw_text)
-        _board = Board(_board_rows)
-        _game = Game(_board)
-        ScriptRunner(_game, _board, _stdout).run(_command_lines)
-    except BoardParsingError as _error:
-        print(f"ERROR {_error.code}", file=_stdout)
-        sys.exit(1)
-    except InvalidPromotionTypeError as _error:
-        print(f"ERROR {_error.code}", file=_stdout)
-        sys.exit(1)
-    except MissingPromotionChoiceError as _error:
-        print(f"ERROR {_error.code}", file=_stdout)
-        sys.exit(1)
+    main()
 '''
 
 
@@ -82,7 +81,8 @@ def main():
 
     script_parser = (PKG / "texttests" / "script_parser.py").read_text(encoding="utf-8")
     parser_body = script_parser.split("class ScriptParser")[0].rstrip()
-    (OUT / "parser.py").write_text(parser_body + "\n\n" + PARSER_MAIN, encoding="utf-8")
+    (OUT / "parser.py").write_text(parser_body + "\n", encoding="utf-8")
+    (OUT / "main.py").write_text(VPL_MAIN, encoding="utf-8")
 
     for dest_name, src_path in FLAT_FILES:
         shutil.copy2(src_path, OUT / dest_name)
@@ -121,8 +121,9 @@ def main():
     shutil.copy2(PKG / "io" / "board_printer.py", OUT / "board_printer.py")
 
     print(f"Created {OUT}")
-    print("Upload these files to VPL:")
-    print("  parser.py, config.py, errors.py, piece.py, board.py, board_printer.py,")
+    print("Upload the entire vpl_submit/ folder to VPL.")
+    print("VPL executes main.py. Required files:")
+    print("  main.py, parser.py, config.py, errors.py, piece.py, board.py, board_printer.py,")
     print("  commands.py, game.py, rules/, engine/, input/, model/, realtime/")
 
 

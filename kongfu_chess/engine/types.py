@@ -1,5 +1,7 @@
 """Public API result types for engine and rules layers (Phase 0 skeleton)."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 

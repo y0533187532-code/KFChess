@@ -10,6 +10,8 @@ feature define entirely different piece types/colors and still reuse this
 class unmodified.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 try:

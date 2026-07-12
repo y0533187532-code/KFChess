@@ -11,10 +11,15 @@ except ImportError:
 
 
 def pawn_start_row(color, num_rows, start_row_by_color=DEFAULT_PAWN_START_ROW_BY_COLOR):
+    """Return the row index where a pawn may make an initial two-cell advance.
+
+    On boards taller than three rows, the starting rank is one row in from the
+    color's home edge (second rank). On three-row boards it is the home edge itself.
+    """
     placement = start_row_by_color[color]
     if placement == "bottom":
-        return num_rows - 1
-    return 0
+        return num_rows - 2 if num_rows > 3 else num_rows - 1
+    return 1 if num_rows > 3 else 0
 
 
 def is_promotion_row(row, num_rows):

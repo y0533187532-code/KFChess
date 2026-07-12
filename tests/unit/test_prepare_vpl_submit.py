@@ -15,6 +15,7 @@ def test_prepare_vpl_submit_generates_layered_package():
 
     out = PROJECT_ROOT / "vpl_submit"
     for name in (
+        "main.py",
         "parser.py",
         "config.py",
         "errors.py",
@@ -31,8 +32,13 @@ def test_prepare_vpl_submit_generates_layered_package():
     assert (out / "model" / "board.py").is_file()
 
     parser = (out / "parser.py").read_text(encoding="utf-8")
-    assert "MissingPromotionChoiceError" in parser
-    assert "InvalidPromotionTypeError" in parser
+    assert "class InputParser" in parser
+    assert 'if __name__ == "__main__"' not in parser
+
+    main_py = (out / "main.py").read_text(encoding="utf-8")
+    assert "MissingPromotionChoiceError" in main_py
+    assert "InvalidPromotionTypeError" in main_py
+    assert 'if __name__ == "__main__"' in main_py
     assert "airborne_jump.py" in {
         path.name for path in (out / "realtime").glob("*.py")
     }

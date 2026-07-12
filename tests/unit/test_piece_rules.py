@@ -182,6 +182,10 @@ def test_white_pawn_double_step_rejected_when_destination_occupied():
 def test_pawn_start_row_and_promotion_row():
     assert pawn_start_row("w", 3) == 2
     assert pawn_start_row("b", 3) == 0
+    assert pawn_start_row("w", 4) == 2
+    assert pawn_start_row("w", 5) == 3
+    assert pawn_start_row("b", 4) == 1
+    assert pawn_start_row("b", 5) == 1
     assert is_promotion_row(0, 3) is True
     assert is_promotion_row(2, 3) is True
     assert is_promotion_row(1, 3) is False
