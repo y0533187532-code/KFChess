@@ -6,6 +6,7 @@ try:
         JUMP_COMMAND,
         PRINT_COMMAND,
         PRINT_BOARD_ARGUMENT,
+        PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
 except ImportError:
@@ -14,6 +15,7 @@ except ImportError:
         JUMP_COMMAND,
         PRINT_COMMAND,
         PRINT_BOARD_ARGUMENT,
+        PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
 
@@ -41,6 +43,8 @@ class ScriptRunner:
             self._run_jump(arguments)
         elif command == WAIT_COMMAND:
             self._run_wait(arguments)
+        elif command == PROMOTE_COMMAND:
+            self._run_promote(arguments)
         elif command == PRINT_COMMAND:
             self._run_print(arguments)
 
@@ -56,6 +60,9 @@ class ScriptRunner:
     def _run_wait(self, arguments):
         milliseconds = int(arguments[0])
         self._game.handle_wait(milliseconds)
+
+    def _run_promote(self, arguments):
+        self._game.handle_promote(arguments[0])
 
     def _run_print(self, arguments):
         if arguments and arguments[0] == PRINT_BOARD_ARGUMENT:

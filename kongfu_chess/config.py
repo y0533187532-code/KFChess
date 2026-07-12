@@ -15,7 +15,7 @@ not inline in business logic. This has two purposes:
 Future extension points (not implemented yet):
 - Binary board: only Board._cells internals change; callers keep using
   get_cell / move_piece / clear_cell.
-- Custom games: inject MovementRules, promotion_policy, game_over_piece_type,
+- Custom games: inject PieceRules, RuleEngine, promotion_policy, game_over_piece_type,
   pawn direction maps, and Board(valid_colors=..., valid_piece_types=...).
 """
 
@@ -41,15 +41,19 @@ PAWN_PIECE_TYPE = "P"
 # Piece type letter for the king - used by Game to detect game-over on capture.
 KING_PIECE_TYPE = "K"
 
-# Piece type letter a pawn promotes to on the last row.
-QUEEN_PIECE_TYPE = "Q"
+# Piece type letter a pawn promotes to when no explicit choice is supplied.
+DEFAULT_PROMOTION_PIECE_TYPE = "Q"
+QUEEN_PIECE_TYPE = DEFAULT_PROMOTION_PIECE_TYPE
 
-# Default pawn direction and start row per color (injectable via MovementRules).
+# Piece types excluded from promotion targets when deriving from registered shapes.
+DEFAULT_NON_PROMOTABLE_PROMOTION_TYPES = frozenset({KING_PIECE_TYPE, PAWN_PIECE_TYPE})
+
+# Default pawn direction and start row per color (injectable via PieceRules).
 DEFAULT_PAWN_FORWARD_BY_COLOR = {WHITE_COLOR: -1, BLACK_COLOR: 1}
 DEFAULT_PAWN_START_ROW_BY_COLOR = {WHITE_COLOR: "bottom", BLACK_COLOR: "top"}
 
 # Default promotion targets per piece type on the last row (injectable via Game).
-DEFAULT_PROMOTION_BY_PIECE_TYPE = {PAWN_PIECE_TYPE: QUEEN_PIECE_TYPE}
+DEFAULT_PROMOTION_BY_PIECE_TYPE = {PAWN_PIECE_TYPE: DEFAULT_PROMOTION_PIECE_TYPE}
 
 # --- Click protocol: pixel <-> cell geometry ---
 # A single source of truth for cell size, so it's never repeated (DRY) and
@@ -62,6 +66,7 @@ CELL_SIZE_PX = 100
 CLICK_COMMAND = "click"
 WAIT_COMMAND = "wait"
 JUMP_COMMAND = "jump"
+PROMOTE_COMMAND = "promote"
 PRINT_COMMAND = "print"
 PRINT_BOARD_ARGUMENT = "board"
 
@@ -88,3 +93,4 @@ class ErrorCode:
     MISSING_SECTION = "MISSING_SECTION"
     DUPLICATE_OCCUPANCY = "DUPLICATE_OCCUPANCY"
     DUPLICATE_PIECE_ID = "DUPLICATE_PIECE_ID"
+    INVALID_PROMOTION_TYPE = "INVALID_PROMOTION_TYPE"

@@ -75,6 +75,15 @@ def test_main_prints_error_and_exits_nonzero_for_invalid_input():
     assert stdout.getvalue().strip() == "ERROR UNKNOWN_TOKEN"
 
 
+def test_main_prints_error_for_invalid_promotion_type():
+    stdin = io.StringIO("Board:\n. wP\nCommands:\npromote K\n")
+    stdout = io.StringIO()
+    with pytest.raises(SystemExit) as excinfo:
+        main(stdin=stdin, stdout=stdout)
+    assert excinfo.value.code == 1
+    assert stdout.getvalue().strip() == "ERROR INVALID_PROMOTION_TYPE"
+
+
 def test_main_handles_leading_whitespace_on_board_header():
     raw_text = (
         " Board:\n"

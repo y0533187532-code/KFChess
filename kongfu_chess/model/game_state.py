@@ -13,6 +13,7 @@ class GameState:
     board: Board
     game_over: bool = False
     selected: tuple | None = field(default=None)
+    promotion_choice: str | None = field(default=None)
 
     @property
     def is_game_over(self):
@@ -23,6 +24,14 @@ class GameState:
 
     def clear_selection(self):
         self.selected = None
+
+    def set_promotion_choice(self, piece_type):
+        self.promotion_choice = piece_type
+
+    def consume_promotion_choice(self):
+        choice = self.promotion_choice
+        self.promotion_choice = None
+        return choice
 
     def select(self, row, col):
         self.selected = (row, col)

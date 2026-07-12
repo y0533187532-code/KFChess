@@ -1,7 +1,7 @@
 """Copy project files into vpl_submit/ for uploading to VPL.
 
 VPL runs parser.py as a script (not as part of a package). Upload the
-entire vpl_submit/ folder contents to VPL, keeping the movement/ subfolder.
+entire vpl_submit/ folder contents to VPL, keeping the rules/ subfolder.
 """
 
 import shutil
@@ -20,13 +20,15 @@ FLAT_FILES = [
     ("game.py", PKG / "game.py"),
 ]
 
-MOVEMENT_FILES = [
+RULES_FILES = [
     "__init__.py",
+    "shapes.py",
     "pawn.py",
     "path.py",
     "routes.py",
-    "rules.py",
-    "shapes.py",
+    "piece_rules.py",
+    "rule_engine.py",
+    "promotion.py",
 ]
 
 PARSER_MAIN = '''\
@@ -71,10 +73,15 @@ def main():
     for dest_name, src_path in FLAT_FILES:
         shutil.copy2(src_path, OUT / dest_name)
 
-    movement_out = OUT / "movement"
-    movement_out.mkdir()
-    for name in MOVEMENT_FILES:
-        shutil.copy2(PKG / "movement" / name, movement_out / name)
+    rules_out = OUT / "rules"
+    rules_out.mkdir()
+    for name in RULES_FILES:
+        shutil.copy2(PKG / "rules" / name, rules_out / name)
+
+    engine_out = OUT / "engine"
+    engine_out.mkdir()
+    for name in ("__init__.py", "types.py", "game_engine.py"):
+        shutil.copy2(PKG / "engine" / name, engine_out / name)
 
     input_out = OUT / "input"
     input_out.mkdir()
@@ -89,7 +96,7 @@ def main():
     print(f"Created {OUT}")
     print("Upload these files to VPL:")
     print("  parser.py, config.py, errors.py, piece.py, board.py,")
-    print("  commands.py, game.py, movement/, input/, model/")
+    print("  commands.py, game.py, rules/, engine/, input/, model/")
 
 
 if __name__ == "__main__":

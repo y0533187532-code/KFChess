@@ -1,8 +1,9 @@
 import pytest
 
 from kongfu_chess.model.board import Board
-from kongfu_chess.movement import (
-    MovementRules,
+from kongfu_chess.rules import (
+    PieceRules,
+    RuleEngine,
     get_move_route,
     is_bishop_move,
     is_king_move,
@@ -58,48 +59,45 @@ def test_queen_move(dr, dc, expected):
     assert is_queen_move(dr, dc) is expected
 
 
-def test_movement_rules_uses_default_rules_for_known_piece_types():
-    rules = MovementRules()
-    assert rules.is_legal("K", 1, 0) is True
-    assert rules.is_legal("K", 2, 0) is False
+def test_piece_rules_uses_default_rules_for_known_piece_types():
+    rules = PieceRules()
+    assert rules.is_legal_shape("K", 1, 0) is True
+    assert rules.is_legal_shape("K", 2, 0) is False
 
 
-def test_movement_rules_returns_false_for_unregistered_piece_type():
-    # A completely unknown piece type must be safely "illegal", never raise.
-    rules = MovementRules()
-    assert rules.is_legal("X", 1, 0) is False
+def test_piece_rules_returns_false_for_unregistered_piece_type():
+    rules = PieceRules()
+    assert rules.is_legal_shape("X", 1, 0) is False
 
 
-def test_movement_rules_supports_registering_a_custom_piece_type():
-    # Future "design your own game": a brand new piece type, registered
-    # without touching MovementRules or Game at all.
-    rules = MovementRules()
+def test_piece_rules_supports_registering_a_custom_piece_type():
+    rules = PieceRules()
     rules.register("D", lambda dr, dc: max(abs(dr), abs(dc)) <= 2)
-    assert rules.is_legal("D", 2, 2) is True
-    assert rules.is_legal("D", 3, 0) is False
+    assert rules.is_legal_shape("D", 2, 2) is True
+    assert rules.is_legal_shape("D", 3, 0) is False
 
 
-def test_movement_rules_can_be_constructed_with_a_fully_custom_rule_set():
-    custom_rules = MovementRules(rules={"X": lambda dr, dc: True})
-    assert custom_rules.is_legal("X", 5, 5) is True
-    assert custom_rules.is_legal("K", 1, 0) is False  # standard "K" not present here
+def test_piece_rules_can_be_constructed_with_a_fully_custom_rule_set():
+    custom_rules = PieceRules(shape_rules={"X": lambda dr, dc: True})
+    assert custom_rules.is_legal_shape("X", 5, 5) is True
+    assert custom_rules.is_legal_shape("K", 1, 0) is False
 
 
 def test_rook_bishop_queen_require_clear_path_by_default():
-    rules = MovementRules()
+    rules = PieceRules()
     assert rules.requires_clear_path("R") is True
     assert rules.requires_clear_path("B") is True
     assert rules.requires_clear_path("Q") is True
 
 
 def test_knight_and_king_do_not_require_clear_path_by_default():
-    rules = MovementRules()
+    rules = PieceRules()
     assert rules.requires_clear_path("N") is False
     assert rules.requires_clear_path("K") is False
 
 
 def test_register_can_mark_a_custom_piece_type_as_sliding():
-    rules = MovementRules()
+    rules = PieceRules()
     rules.register("D", lambda dr, dc: True, sliding=True)
     assert rules.requires_clear_path("D") is True
 
@@ -189,10 +187,10 @@ def test_pawn_start_row_and_promotion_row():
     assert is_promotion_row(1, 3) is False
 
 
-def test_pawn_forward_direction_is_injectable_via_movement_rules():
-    rules = MovementRules(pawn_forward_by_color={"w": 1, "b": -1})
-    assert rules.is_legal("P", 1, 0, color="w", target_piece=None) is True
-    assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is False
+def test_pawn_forward_direction_is_injectable_via_piece_rules():
+    rules = PieceRules(pawn_forward_by_color={"w": 1, "b": -1})
+    assert rules.is_legal_shape("P", 1, 0, color="w", target_piece=None) is True
+    assert rules.is_legal_shape("P", -1, 0, color="w", target_piece=None) is False
 
 
 def test_pawn_cannot_move_forward_to_occupied_cell():
@@ -227,15 +225,15 @@ def test_pawn_cannot_capture_own_color_diagonally():
     assert is_pawn_move(-1, 1, "w", friendly) is False
 
 
-def test_movement_rules_is_legal_delegates_to_pawn_correctly():
+def test_piece_rules_is_legal_shape_delegates_to_pawn_correctly():
     from kongfu_chess.model.piece import Piece
-    rules = MovementRules()
+    rules = PieceRules()
     enemy = Piece(color="b", piece_type="P")
     board = Board([[".", "."], [".", "."], [".", "wP"]])
-    assert rules.is_legal("P", -1, 0, color="w", target_piece=None) is True
-    assert rules.is_legal("P", -1, 1, color="w", target_piece=enemy) is True
-    assert rules.is_legal("P", -2, 0, color="w", target_piece=None) is False
-    assert rules.is_legal(
+    assert rules.is_legal_shape("P", -1, 0, color="w", target_piece=None) is True
+    assert rules.is_legal_shape("P", -1, 1, color="w", target_piece=enemy) is True
+    assert rules.is_legal_shape("P", -2, 0, color="w", target_piece=None) is False
+    assert rules.is_legal_shape(
         "P",
         -2,
         0,

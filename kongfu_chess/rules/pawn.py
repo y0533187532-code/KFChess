@@ -1,4 +1,4 @@
-﻿try:
+try:
     from ..config import (
         DEFAULT_PAWN_FORWARD_BY_COLOR,
         DEFAULT_PAWN_START_ROW_BY_COLOR,
@@ -18,7 +18,7 @@ def pawn_start_row(color, num_rows, start_row_by_color=DEFAULT_PAWN_START_ROW_BY
 
 
 def is_promotion_row(row, num_rows):
-    """Return True if row is a promotion row (consumed by Game's promotion policy, not MovementRules)."""
+    """Return True if row is a promotion row (consumed by Game's promotion policy)."""
     return row == 0 or row == num_rows - 1
 
 
@@ -34,13 +34,6 @@ def is_pawn_move(
     forward_by_color=DEFAULT_PAWN_FORWARD_BY_COLOR,
     start_row_by_color=DEFAULT_PAWN_START_ROW_BY_COLOR,
 ):
-    """Return True if a pawn of ``color`` can move by (dr, dc) to a cell
-    occupied by ``target_piece`` (a Piece or None for an empty cell).
-
-    For a double-step forward from the start row, ``board``, ``from_row``,
-    ``from_col``, and ``to_col`` are required to verify the intermediate
-    cell is empty.
-    """
     forward = forward_by_color[color]
     if dc == 0 and dr == forward:
         return target_piece is None

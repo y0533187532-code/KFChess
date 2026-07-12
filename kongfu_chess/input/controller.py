@@ -7,12 +7,12 @@ except ImportError:
 
 
 class Controller:
-    """Handles click selection; delegates move execution to the game layer."""
+    """Handles click selection; delegates move execution to the game engine."""
 
-    def __init__(self, board, state, game, mapper=None):
+    def __init__(self, board, state, engine, mapper=None):
         self._board = board
         self._state = state
-        self._game = game
+        self._engine = engine
         self._mapper = mapper or BoardMapper()
 
     @property
@@ -31,7 +31,7 @@ class Controller:
 
         row, col = cell.row, cell.col
         clicked_piece = self._board.get_cell(row, col)
-        moving_origins = self._game.moving_origins()
+        moving_origins = self._engine.moving_origins()
 
         if self._state.selected is None:
             if clicked_piece is not None and (row, col) not in moving_origins:
@@ -47,7 +47,8 @@ class Controller:
             if clicked_piece is None:
                 self._state.clear_selection()
             else:
-                self._game.request_jump(from_row, from_col)
+                self._engine.request_jump(from_row, from_col)
+                self._state.clear_selection()
             return
 
         selected_piece = self._board.get_cell(from_row, from_col)
@@ -57,4 +58,5 @@ class Controller:
             else:
                 self._state.select(row, col)
         else:
-            self._game.request_move_to(row, col)
+            self._engine.request_move(from_row, from_col, row, col)
+            self._state.clear_selection()

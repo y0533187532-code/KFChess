@@ -4,7 +4,7 @@ A Game reacts to clicks, time passing (``handle_wait``), and airborne jumps
 (same-cell re-click or the ``jump`` command). It never touches the raw board
 grid directly (encapsulation): pieces move only through Board's public API.
 
-Move legality is delegated to ``MovementRules`` (shape + path). In-flight
+Move legality is delegated to ``RuleEngine`` (via ``PieceRules``). In-flight
 moves live in ``_active_moves``; parallel travel is allowed when routes do
 not conflict. The board updates when ``handle_wait`` completes a move or
 when an airborne jump captures an arriving enemy.
@@ -13,7 +13,7 @@ Capturing the configured game-over piece (default: king) ends the game;
 subsequent ``handle_click`` calls are ignored.
 
 Extension hooks (defaults preserve standard Kong-Fu-Chess rules):
-- ``movement_rules`` — custom piece shapes / pawn direction maps
+- ``piece_rules`` / ``rule_engine`` — custom piece shapes / pawn direction maps
 - ``move_durations`` / ``jump_duration_ms`` — travel timings
 - ``promotion_policy(moving_piece, to_row, num_rows) -> piece_type | None``
 - ``game_over_piece_type`` — which captured piece type ends the game
@@ -28,17 +28,16 @@ try:
     )
     from .input.controller import Controller
     from .model.game_state import GameState
-    from .movement import (
-        MovementRules,
+    from .rules import (
+        PieceRules,
+        RuleEngine,
         get_move_route,
-        is_path_clear,
         is_promotion_row,
         is_route_conflict,
         is_swap_route,
     )
 except ImportError:
     from config import (
-        CELL_SIZE_PX,
         DEFAULT_JUMP_DURATION_MS,
         DEFAULT_MOVE_DURATION_MS,
         DEFAULT_PROMOTION_BY_PIECE_TYPE,
@@ -46,10 +45,10 @@ except ImportError:
     )
     from input.controller import Controller
     from model.game_state import GameState
-    from movement import (
-        MovementRules,
+    from rules import (
+        PieceRules,
+        RuleEngine,
         get_move_route,
-        is_path_clear,
         is_promotion_row,
         is_route_conflict,
         is_swap_route,
@@ -67,14 +66,16 @@ class Game:
     def __init__(
         self,
         board,
-        movement_rules=None,
+        piece_rules=None,
+        rule_engine=None,
         move_durations=None,
         jump_duration_ms=None,
         promotion_policy=None,
         game_over_piece_type=None,
     ):
         self._board = board
-        self._movement_rules = movement_rules or MovementRules()
+        piece_rules = piece_rules or PieceRules()
+        self._rule_engine = rule_engine or RuleEngine(piece_rules)
         self._move_durations = dict(
             move_durations if move_durations is not None else DEFAULT_MOVE_DURATION_MS
         )
@@ -223,23 +224,11 @@ class Game:
     def _attempt_move_to(self, row, col):
         from_row, from_col = self._selected
         piece = self._selected_piece
-        dr, dc = row - from_row, col - from_col
-        target_piece = self._board.get_cell(row, col)
 
         if not (
-            self._movement_rules.is_legal(
-                piece.piece_type,
-                dr,
-                dc,
-                color=piece.color,
-                target_piece=target_piece,
-                board=self._board,
-                from_row=from_row,
-                from_col=from_col,
-                to_row=row,
-                to_col=col,
-            )
-            and self._path_is_clear(piece.piece_type, from_row, from_col, row, col)
+            self._rule_engine.validate_move(
+                self._board, from_row, from_col, row, col
+            ).is_valid
         ):
             self._selected = None
             return
@@ -331,8 +320,3 @@ class Game:
             )
             and other["order"] < move["order"]
         )
-
-    def _path_is_clear(self, piece_type, from_row, from_col, row, col):
-        if not self._movement_rules.requires_clear_path(piece_type):
-            return True
-        return is_path_clear(self._board, from_row, from_col, row, col)

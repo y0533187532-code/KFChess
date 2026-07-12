@@ -1,5 +1,8 @@
 import io
 
+import pytest
+
+from kongfu_chess.errors import InvalidPromotionTypeError
 from kongfu_chess.model.board import Board
 from kongfu_chess.texttests.script_runner import ScriptRunner
 from kongfu_chess.game import Game
@@ -54,6 +57,19 @@ def test_unknown_command_is_ignored():
     board, runner, stdout = make_runner([["wK"]])
     runner.run(["fly 1 2"])
     assert stdout.getvalue() == ""
+
+
+def test_promote_command_is_dispatched_to_the_game():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, runner, stdout = make_runner(rows)
+    runner.run(["click 150 150", "promote R", "click 150 50", "wait 1000"])
+    assert board.get_cell(0, 1).token == "wR"
+
+
+def test_invalid_promote_command_raises_validation_error():
+    board, runner, stdout = make_runner([["wP"]])
+    with pytest.raises(InvalidPromotionTypeError):
+        runner.run(["promote K"])
 
 
 def test_full_command_sequence_end_to_end():

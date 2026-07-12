@@ -1,5 +1,8 @@
+import pytest
+
 from kongfu_chess.model.board import Board
 from kongfu_chess.config import DEFAULT_JUMP_DURATION_MS, DEFAULT_MOVE_DURATION_MS
+from kongfu_chess.errors import InvalidPromotionTypeError
 from kongfu_chess.game import Game
 
 FULL_MOVE_WAIT_MS = DEFAULT_MOVE_DURATION_MS["K"]
@@ -142,15 +145,15 @@ def test_unsupported_piece_type_move_is_ignored_not_crashed():
     assert board.get_cell(0, 1) is None
 
 
-def test_game_accepts_custom_movement_rules_for_future_custom_games():
-    from kongfu_chess.movement import MovementRules
+def test_game_accepts_custom_piece_rules_for_future_custom_games():
+    from kongfu_chess.rules import PieceRules
 
-    rules = MovementRules()
+    rules = PieceRules()
     rules.register("D", lambda dr, dc: max(abs(dr), abs(dc)) <= 2)
 
     rows = [["wD", ".", ".", "."], [".", ".", ".", "."], [".", ".", ".", "."]]
     board = Board(rows, valid_piece_types={"D"})
-    game = Game(board, movement_rules=rules, move_durations={"D": FULL_MOVE_WAIT_MS})
+    game = Game(board, piece_rules=rules, move_durations={"D": FULL_MOVE_WAIT_MS})
 
     game.handle_click(50, 50)
     game.handle_click(50, 250)  # 2 cells down - legal for the custom "D" rule
@@ -471,6 +474,60 @@ def test_black_pawn_captures_diagonally():
     assert board.get_cell(1, 1) is None
 
 
+def test_pawn_promotes_to_rook_when_promote_command_is_used():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    original_id = board.get_cell(1, 1).piece_id
+    game.handle_click(150, 150)
+    game.handle_promote("R")
+    game.handle_click(150, 50)
+    finish_move(game)
+    promoted = board.get_cell(0, 1)
+    assert promoted.token == "wR"
+    assert promoted.piece_id == original_id
+
+
+def test_pawn_promotes_to_bishop_when_promote_command_is_used():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)
+    game.handle_promote("B")
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wB"
+
+
+def test_pawn_promotes_to_knight_when_promote_command_is_used():
+    rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)
+    game.handle_promote("N")
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wN"
+
+
+def test_promote_command_consumes_choice_after_one_promotion():
+    rows = [[".", ".", "."], [".", "wP", "wP"], [".", ".", "."]]
+    board, game = make_game(rows)
+    game.handle_click(150, 150)
+    game.handle_promote("R")
+    game.handle_click(150, 50)
+    finish_move(game)
+    assert board.get_cell(0, 1).token == "wR"
+    game.handle_click(250, 150)
+    game.handle_click(250, 50)
+    finish_move(game)
+    assert board.get_cell(0, 2).token == "wQ"
+
+
+def test_invalid_promote_type_raises_validation_error():
+    board, game = make_game([["wP"]])
+    with pytest.raises(InvalidPromotionTypeError) as excinfo:
+        game.handle_promote("K")
+    assert excinfo.value.code == "INVALID_PROMOTION_TYPE"
+
+
 def test_promoted_queen_can_move_as_queen():
     rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
     board, game = make_game(rows)
@@ -598,14 +655,18 @@ def test_same_cell_reclick_on_empty_cell_clears_selection():
 
 def test_default_promotion_policy_returns_none_for_missing_piece():
     from kongfu_chess.game import default_promotion_policy
+    from kongfu_chess.rules import PieceRules
 
-    assert default_promotion_policy(None, 0, 3) is None
+    assert default_promotion_policy(None, 0, 3, PieceRules()) is None
 
 
 def test_custom_promotion_policy_can_disable_promotion():
     rows = [[".", ".", "."], [".", "wP", "."], [".", ".", "."]]
     board = Board(rows)
-    game = Game(board, promotion_policy=lambda moving, to_row, num_rows: None)
+    game = Game(
+        board,
+        promotion_policy=lambda moving, to_row, num_rows, chosen_type=None: None,
+    )
     game.handle_click(150, 150)
     game.handle_click(150, 50)
     finish_move(game)
@@ -613,9 +674,9 @@ def test_custom_promotion_policy_can_disable_promotion():
 
 
 def test_custom_promotion_policy_can_target_different_piece():
-    from kongfu_chess.movement import is_promotion_row
+    from kongfu_chess.rules import is_promotion_row
 
-    def promote_to_rook(moving, to_row, num_rows):
+    def promote_to_rook(moving, to_row, num_rows, chosen_type=None):
         if is_promotion_row(to_row, num_rows):
             return "R"
         return None
