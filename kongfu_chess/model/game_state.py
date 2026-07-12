@@ -14,6 +14,7 @@ class GameState:
     game_over: bool = False
     selected: tuple | None = field(default=None)
     promotion_choice: str | None = field(default=None)
+    captured_pieces: list = field(default_factory=list)
 
     @property
     def is_game_over(self):
@@ -35,3 +36,7 @@ class GameState:
 
     def select(self, row, col):
         self.selected = (row, col)
+
+    def record_capture(self, piece, row, col):
+        """Remember a captured piece for snapshot rendering."""
+        self.captured_pieces.append((piece, row, col))

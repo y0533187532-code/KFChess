@@ -50,7 +50,15 @@ def test_validate_move_blocked_sliding_path():
     engine = RuleEngine()
     result = engine.validate_move(board, 0, 0, 0, 2)
     assert result.is_valid is False
-    assert result.reason == "illegal_piece_move"
+    assert result.reason == "path_blocked"
+
+
+def test_validate_move_blocked_sliding_path_through_friendly_piece():
+    board = Board([["wR", "wP", "."]])
+    engine = RuleEngine()
+    result = engine.validate_move(board, 0, 0, 0, 2)
+    assert result.is_valid is False
+    assert result.reason == "path_blocked"
 
 
 def test_legal_destinations_for_rook_on_open_rank():

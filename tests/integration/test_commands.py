@@ -3,6 +3,7 @@ import io
 import pytest
 
 from kongfu_chess.errors import InvalidPromotionTypeError
+from kongfu_chess.io.board_printer import BoardPrinter
 from kongfu_chess.model.board import Board
 from kongfu_chess.texttests.script_runner import ScriptRunner
 from kongfu_chess.game import Game
@@ -39,6 +40,24 @@ def test_wait_command_is_dispatched_without_error():
     board, runner, stdout = make_runner([["wK"]])
     runner.run(["wait 250"])
     assert board.get_cell(0, 0).token == "wK"
+
+
+def test_print_board_command_uses_board_printer_on_game_snapshot():
+    board, runner, stdout = make_runner([["wK", "."], [".", "bK"]])
+
+    class TrackingPrinter(BoardPrinter):
+        def __init__(self):
+            self.last_source = None
+
+        def print(self, source, out):
+            self.last_source = source
+            return super().print(source, out)
+
+    printer = TrackingPrinter()
+    runner = ScriptRunner(runner._game, board, stdout, board_printer=printer)
+    runner.run(["print board"])
+    assert stdout.getvalue().splitlines() == ["wK .", ". bK"]
+    assert printer.last_source == runner._game.snapshot()
 
 
 def test_print_board_command_prints_the_current_state():

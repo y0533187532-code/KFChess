@@ -1,6 +1,6 @@
 """Application entry: parse input, run commands, return the resulting Board."""
 
-from .errors import BoardParsingError, InvalidPromotionTypeError
+from .errors import BoardParsingError, InvalidPromotionTypeError, MissingPromotionChoiceError
 from .game import Game
 from .io.board_parser import BoardParser
 from .texttests.script_parser import InputParser
@@ -23,4 +23,4 @@ def run(raw_text, stdout, input_parser=None, board_parser=None):
     return board
 
 
-__all__ = ["BoardParsingError", "InvalidPromotionTypeError", "run"]
+__all__ = ["BoardParsingError", "InvalidPromotionTypeError", "MissingPromotionChoiceError", "run"]

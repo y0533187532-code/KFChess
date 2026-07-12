@@ -38,12 +38,20 @@ if __name__ == "__main__":
     try:
         from .board import Board
         from .commands import ScriptRunner
-        from .errors import BoardParsingError
+        from .errors import (
+            BoardParsingError,
+            InvalidPromotionTypeError,
+            MissingPromotionChoiceError,
+        )
         from .game import Game
     except ImportError:
         from board import Board
         from commands import ScriptRunner
-        from errors import BoardParsingError
+        from errors import (
+            BoardParsingError,
+            InvalidPromotionTypeError,
+            MissingPromotionChoiceError,
+        )
         from game import Game
 
     _stdin = sys.stdin
@@ -56,6 +64,12 @@ if __name__ == "__main__":
         _game = Game(_board)
         ScriptRunner(_game, _board, _stdout).run(_command_lines)
     except BoardParsingError as _error:
+        print(f"ERROR {_error.code}", file=_stdout)
+        sys.exit(1)
+    except InvalidPromotionTypeError as _error:
+        print(f"ERROR {_error.code}", file=_stdout)
+        sys.exit(1)
+    except MissingPromotionChoiceError as _error:
         print(f"ERROR {_error.code}", file=_stdout)
         sys.exit(1)
 '''
@@ -101,12 +115,14 @@ def main():
 
     model_out = OUT / "model"
     model_out.mkdir()
-    for name in ("__init__.py", "position.py", "game_state.py"):
+    for name in ("__init__.py", "position.py", "game_state.py", "board.py", "piece.py"):
         shutil.copy2(PKG / "model" / name, model_out / name)
+
+    shutil.copy2(PKG / "io" / "board_printer.py", OUT / "board_printer.py")
 
     print(f"Created {OUT}")
     print("Upload these files to VPL:")
-    print("  parser.py, config.py, errors.py, piece.py, board.py,")
+    print("  parser.py, config.py, errors.py, piece.py, board.py, board_printer.py,")
     print("  commands.py, game.py, rules/, engine/, input/, model/, realtime/")
 
 

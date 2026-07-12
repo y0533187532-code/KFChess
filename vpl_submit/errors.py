@@ -65,3 +65,18 @@ class DuplicatePieceIdError(BoardParsingError):
     def __init__(self, piece_id):
         self.piece_id = piece_id
         super().__init__(f"Duplicate piece id: {piece_id}")
+
+
+class InvalidPromotionTypeError(Exception):
+    code = ErrorCode.INVALID_PROMOTION_TYPE
+
+    def __init__(self, piece_type):
+        self.piece_type = piece_type
+        super().__init__(f"Invalid promotion piece type: {piece_type!r}")
+
+
+class MissingPromotionChoiceError(Exception):
+    code = ErrorCode.MISSING_PROMOTION_CHOICE
+
+    def __init__(self):
+        super().__init__("Promotion choice required when queen is not allowed")

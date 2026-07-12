@@ -9,6 +9,7 @@ try:
         PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    from ..io.board_printer import BoardPrinter
 except ImportError:
     from config import (
         CLICK_COMMAND,
@@ -18,13 +19,18 @@ except ImportError:
         PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    try:
+        from board_printer import BoardPrinter
+    except ImportError:
+        from io.board_printer import BoardPrinter  # pragma: no cover
 
 
 class ScriptRunner:
-    def __init__(self, game, board, stdout):
+    def __init__(self, game, board, stdout, board_printer=None):
         self._game = game
         self._board = board
         self._stdout = stdout
+        self._board_printer = board_printer or BoardPrinter()
 
     def run(self, command_lines):
         for line in command_lines:
@@ -66,8 +72,7 @@ class ScriptRunner:
 
     def _run_print(self, arguments):
         if arguments and arguments[0] == PRINT_BOARD_ARGUMENT:
-            for row in self._board.render_rows():
-                print(row, file=self._stdout)
+            self._board_printer.print(self._game.snapshot(), self._stdout)
 
 
 CommandRunner = ScriptRunner

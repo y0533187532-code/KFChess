@@ -16,9 +16,22 @@ class MoveResult:
 
 
 @dataclass(frozen=True)
+class PieceSnapshot:
+    """Read-only piece view for rendering (row, col, token, piece_id, state)."""
+
+    row: int
+    col: int
+    token: str
+    piece_id: int
+    state: str = "idle"
+
+
+@dataclass(frozen=True)
 class GameSnapshot:
+    """Read-only view model / DTO for the renderer and diagnostics."""
+
     board_width: int
     board_height: int
     game_over: bool
     selected: tuple | None = None
-    pieces: tuple = field(default_factory=tuple)
+    pieces: tuple[PieceSnapshot, ...] = field(default_factory=tuple)

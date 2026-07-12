@@ -1,0 +1,15 @@
+# Knight L-shaped move through click, wait, print board.
+
+Board:
+wN . .
+. . .
+. . .
+Commands:
+click 50 50
+click 150 250
+wait 1000
+print board
+Expect:
+. . .
+. . .
+. wN .

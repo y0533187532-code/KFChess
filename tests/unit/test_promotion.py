@@ -155,3 +155,18 @@ def test_script_runner_raises_when_promotion_choice_missing():
         ScriptRunner(game, board, stdout).run(
             ["click 150 150", "click 150 50", "wait 1000"]
         )
+
+
+def test_promotion_choice_not_consumed_when_non_pawn_arrives_first():
+    """Parallel arrival: rook finishing must not steal a pending promote choice."""
+    rows = [["wR", ".", "."], [".", "wP", "."], [".", ".", "."]]
+    board = Board(rows)
+    game = Game(board)
+    game.handle_click(50, 50)
+    game.handle_click(50, 150)
+    game.handle_click(150, 150)
+    game.handle_promote("R")
+    game.handle_click(150, 50)
+    game.handle_wait(1000)
+    assert board.get_cell(0, 1).token == "wR"
+    assert board.get_cell(1, 0).token == "wR"

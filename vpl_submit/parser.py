@@ -41,12 +41,20 @@ if __name__ == "__main__":
     try:
         from .board import Board
         from .commands import ScriptRunner
-        from .errors import BoardParsingError
+        from .errors import (
+            BoardParsingError,
+            InvalidPromotionTypeError,
+            MissingPromotionChoiceError,
+        )
         from .game import Game
     except ImportError:
         from board import Board
         from commands import ScriptRunner
-        from errors import BoardParsingError
+        from errors import (
+            BoardParsingError,
+            InvalidPromotionTypeError,
+            MissingPromotionChoiceError,
+        )
         from game import Game
 
     _stdin = sys.stdin
@@ -59,5 +67,11 @@ if __name__ == "__main__":
         _game = Game(_board)
         ScriptRunner(_game, _board, _stdout).run(_command_lines)
     except BoardParsingError as _error:
+        print(f"ERROR {_error.code}", file=_stdout)
+        sys.exit(1)
+    except InvalidPromotionTypeError as _error:
+        print(f"ERROR {_error.code}", file=_stdout)
+        sys.exit(1)
+    except MissingPromotionChoiceError as _error:
         print(f"ERROR {_error.code}", file=_stdout)
         sys.exit(1)

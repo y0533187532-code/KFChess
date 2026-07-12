@@ -2,10 +2,12 @@
 
 try:
     from ..engine.types import MoveValidation
+    from .path import is_path_clear
     from .piece_rules import PieceRules
 except ImportError:
     from engine.types import MoveValidation
-    from piece_rules import PieceRules
+    from rules.path import is_path_clear
+    from rules.piece_rules import PieceRules
 
 
 class RuleEngine:
@@ -28,9 +30,25 @@ class RuleEngine:
         if target is not None and target.color == piece.color:
             return MoveValidation(is_valid=False, reason="friendly_destination")
 
-        if not self._piece_rules.is_legal_move(
-            board, piece, from_row, from_col, to_row, to_col
+        dr, dc = to_row - from_row, to_col - from_col
+        if not self._piece_rules.is_legal_shape(
+            piece.piece_type,
+            dr,
+            dc,
+            color=piece.color,
+            target_piece=target,
+            board=board,
+            from_row=from_row,
+            from_col=from_col,
+            to_row=to_row,
+            to_col=to_col,
         ):
             return MoveValidation(is_valid=False, reason="illegal_piece_move")
+
+        if (
+            self._piece_rules.requires_clear_path(piece.piece_type)
+            and not is_path_clear(board, from_row, from_col, to_row, to_col)
+        ):
+            return MoveValidation(is_valid=False, reason="path_blocked")
 
         return MoveValidation(is_valid=True, reason="ok")

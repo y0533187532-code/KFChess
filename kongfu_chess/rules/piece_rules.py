@@ -19,9 +19,9 @@ except ImportError:
         PAWN_PIECE_TYPE,
     )
     from model.position import Position
-    from path import is_path_clear
-    from pawn import is_pawn_move
-    from shapes import DEFAULT_SHAPE_RULES
+    from rules.path import is_path_clear
+    from rules.pawn import is_pawn_move
+    from rules.shapes import DEFAULT_SHAPE_RULES
 
 
 DEFAULT_SLIDING_PIECE_TYPES = frozenset({"R", "B", "Q"})

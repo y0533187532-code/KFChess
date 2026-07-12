@@ -6,23 +6,31 @@ try:
         JUMP_COMMAND,
         PRINT_COMMAND,
         PRINT_BOARD_ARGUMENT,
+        PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    from ..io.board_printer import BoardPrinter
 except ImportError:
     from config import (
         CLICK_COMMAND,
         JUMP_COMMAND,
         PRINT_COMMAND,
         PRINT_BOARD_ARGUMENT,
+        PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    try:
+        from board_printer import BoardPrinter
+    except ImportError:
+        from io.board_printer import BoardPrinter  # pragma: no cover
 
 
 class ScriptRunner:
-    def __init__(self, game, board, stdout):
+    def __init__(self, game, board, stdout, board_printer=None):
         self._game = game
         self._board = board
         self._stdout = stdout
+        self._board_printer = board_printer or BoardPrinter()
 
     def run(self, command_lines):
         for line in command_lines:
@@ -41,6 +49,8 @@ class ScriptRunner:
             self._run_jump(arguments)
         elif command == WAIT_COMMAND:
             self._run_wait(arguments)
+        elif command == PROMOTE_COMMAND:
+            self._run_promote(arguments)
         elif command == PRINT_COMMAND:
             self._run_print(arguments)
 
@@ -57,10 +67,12 @@ class ScriptRunner:
         milliseconds = int(arguments[0])
         self._game.handle_wait(milliseconds)
 
+    def _run_promote(self, arguments):
+        self._game.handle_promote(arguments[0])
+
     def _run_print(self, arguments):
         if arguments and arguments[0] == PRINT_BOARD_ARGUMENT:
-            for row in self._board.render_rows():
-                print(row, file=self._stdout)
+            self._board_printer.print(self._game.snapshot(), self._stdout)
 
 
 CommandRunner = ScriptRunner

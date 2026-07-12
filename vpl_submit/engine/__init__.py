@@ -1,3 +1,10 @@
-from .types import GameSnapshot, MoveResult, MoveValidation
+from .types import GameSnapshot, MoveResult, MoveValidation, PieceSnapshot
+from .game_engine import GameEngine
 
-__all__ = ["GameSnapshot", "MoveResult", "MoveValidation"]
+__all__ = [
+    "GameEngine",
+    "GameSnapshot",
+    "MoveResult",
+    "MoveValidation",
+    "PieceSnapshot",
+]

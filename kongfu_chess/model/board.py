@@ -9,7 +9,7 @@ try:
         RowWidthMismatchError,
         UnknownTokenError,
     )
-    from .piece import Piece
+    from .piece import Piece, PIECE_STATE_IDLE
 except ImportError:
     from config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
     from errors import (
@@ -19,7 +19,7 @@ except ImportError:
         RowWidthMismatchError,
         UnknownTokenError,
     )
-    from piece import Piece
+    from piece import Piece, PIECE_STATE_IDLE
 
 
 class Board:
@@ -103,6 +103,7 @@ class Board:
         piece = self._cells[from_row][from_col]
         if promotion_piece_type is not None:
             piece = piece.with_piece_type(promotion_piece_type)
+        piece = piece.with_state(PIECE_STATE_IDLE)
         self._cells[to_row][to_col] = piece
         self._cells[from_row][from_col] = None
 
