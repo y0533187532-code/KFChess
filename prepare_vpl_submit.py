@@ -83,6 +83,11 @@ def main():
     for name in ("__init__.py", "types.py", "game_engine.py"):
         shutil.copy2(PKG / "engine" / name, engine_out / name)
 
+    realtime_out = OUT / "realtime"
+    realtime_out.mkdir()
+    for name in ("__init__.py", "motion.py", "real_time_arbiter.py"):
+        shutil.copy2(PKG / "realtime" / name, realtime_out / name)
+
     input_out = OUT / "input"
     input_out.mkdir()
     for name in ("__init__.py", "board_mapper.py", "controller.py"):
@@ -96,7 +101,7 @@ def main():
     print(f"Created {OUT}")
     print("Upload these files to VPL:")
     print("  parser.py, config.py, errors.py, piece.py, board.py,")
-    print("  commands.py, game.py, rules/, engine/, input/, model/")
+    print("  commands.py, game.py, rules/, engine/, input/, model/, realtime/")
 
 
 if __name__ == "__main__":

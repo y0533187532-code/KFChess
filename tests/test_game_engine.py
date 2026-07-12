@@ -64,3 +64,23 @@ def test_request_move_rejects_friendly_destination():
     result = engine.request_move(0, 0, 0, 1)
     assert result == MoveResult(is_accepted=False, reason="friendly_destination")
     assert engine.active_moves == []
+
+
+def test_wait_delegates_to_arbiter_without_board_change_mid_flight():
+    board, _, engine = make_engine([["wK", "."]])
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(500)
+    assert board.get_cell(0, 0).token == "wK"
+    assert engine.has_active_motion() is True
+
+
+def test_parallel_non_conflicting_moves_both_accepted_while_in_flight():
+    """No motion_in_progress guard — second move may start during first."""
+    board, _, engine = make_engine([["wK", ".", ".", "bK"]])
+    first = engine.request_move(0, 0, 0, 1)
+    second = engine.request_move(0, 3, 0, 2)
+    assert first == MoveResult(is_accepted=True, reason="ok")
+    assert second == MoveResult(is_accepted=True, reason="ok")
+    assert len(engine.active_moves) == 2
+    assert board.get_cell(0, 0).token == "wK"
+    assert board.get_cell(0, 3).token == "bK"
