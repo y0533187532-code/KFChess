@@ -21,12 +21,13 @@ Extension hooks (defaults preserve standard Kong-Fu-Chess rules):
 
 try:
     from .config import (
-        CELL_SIZE_PX,
         DEFAULT_JUMP_DURATION_MS,
         DEFAULT_MOVE_DURATION_MS,
         DEFAULT_PROMOTION_BY_PIECE_TYPE,
         KING_PIECE_TYPE,
     )
+    from .input.controller import Controller
+    from .model.game_state import GameState
     from .movement import (
         MovementRules,
         get_move_route,
@@ -43,6 +44,8 @@ except ImportError:
         DEFAULT_PROMOTION_BY_PIECE_TYPE,
         KING_PIECE_TYPE,
     )
+    from input.controller import Controller
+    from model.game_state import GameState
     from movement import (
         MovementRules,
         get_move_route,
@@ -86,62 +89,47 @@ class Game:
             if game_over_piece_type is not None
             else KING_PIECE_TYPE
         )
-        self._selected = None  # None, or a (row, col) tuple
+        self._state = GameState(board=board)
         self._active_moves = []
         self._next_order = 0
-        self._game_over = False
+        self._controller = Controller(board, self._state, self)
+
+    @property
+    def state(self):
+        return self._state
 
     @property
     def is_game_over(self):
-        return self._game_over
+        return self._state.is_game_over
+
+    @property
+    def _selected(self):
+        return self._state.selected
+
+    @_selected.setter
+    def _selected(self, value):
+        self._state.selected = value
+
+    @property
+    def _game_over(self):
+        return self._state.game_over
+
+    @_game_over.setter
+    def _game_over(self, value):
+        self._state.game_over = value
 
     def handle_click(self, pixel_x, pixel_y):
-        """Handle a click at the given pixel coordinates.
+        """Handle a click at the given pixel coordinates."""
+        self._controller.click(pixel_x, pixel_y)
 
-        - Ignored entirely once the game is over.
-        - Clicking outside the board is ignored.
-        - A piece whose origin is currently in-flight cannot be selected.
-        - Clicking a piece with nothing selected selects it (if not moving).
-        - Clicking an empty cell with nothing selected is ignored.
-        - Clicking another friendly piece while one is selected replaces
-          the selection (unless that friendly is in-flight).
-        - Otherwise, a move is attempted: if legal and route-conflict-free,
-          it is queued as in-flight; the selection is cleared either way.
-        """
-        if self._game_over:
-            return
+    def moving_origins(self):
+        return {move["from"] for move in self._active_moves}
 
-        row, col = self._pixel_to_cell(pixel_x, pixel_y)
-        if not self._board.in_bounds(row, col):
-            return
+    def request_move_to(self, row, col):
+        self._attempt_move_to(row, col)
 
-        clicked_piece = self._board.get_cell(row, col)
-        moving_origins = {move["from"] for move in self._active_moves}
-
-        if self._selected is None:
-            if clicked_piece is not None and (row, col) not in moving_origins:
-                self._selected = (row, col)
-            return
-
-        from_row, from_col = self._selected
-        if (from_row, from_col) in moving_origins:
-            self._selected = None
-            return
-
-        if (row, col) == (from_row, from_col):
-            if clicked_piece is None:
-                self._selected = None
-            else:
-                self._attempt_jump(from_row, from_col)
-            return
-
-        if clicked_piece is not None and clicked_piece.color == self._selected_piece.color:
-            if (row, col) in moving_origins:
-                self._selected = None
-            else:
-                self._selected = (row, col)
-        else:
-            self._attempt_move_to(row, col)
+    def request_jump(self, from_row, from_col):
+        self._attempt_jump(from_row, from_col)
 
     def handle_wait(self, milliseconds):
         """Advance the game clock by ``milliseconds``.
@@ -298,7 +286,7 @@ class Game:
             from_row, from_col, to_row, to_col, promotion_piece_type=promotion
         )
         if self._is_enemy_king_capture(captured, move["color"]):
-            self._game_over = True
+            self._state.mark_game_over()
 
     def _resolve_promotion(self, moving, to_row):
         return self._promotion_policy(moving, to_row, self._board.num_rows)
@@ -348,6 +336,3 @@ class Game:
         if not self._movement_rules.requires_clear_path(piece_type):
             return True
         return is_path_clear(self._board, from_row, from_col, row, col)
-
-    def _pixel_to_cell(self, pixel_x, pixel_y):
-        return pixel_y // CELL_SIZE_PX, pixel_x // CELL_SIZE_PX

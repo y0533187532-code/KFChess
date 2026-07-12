@@ -1,33 +1,24 @@
-"""The game board.
-
-Design notes for two known-but-not-yet-implemented future needs:
-
-* Binary board representation: the internal cell storage (``self._cells``)
-  is a private attribute. Nothing outside this class ever touches it
-  directly - all access goes through ``get_cell`` / ``num_rows`` /
-  ``num_cols``. When a compact/binary representation is introduced, only
-  the body of this class needs to change: ``_cells`` could become an
-  ``array('B')``, a bitboard, or any other encoding; ``get_cell`` would
-  decode a cell into a ``Piece``, and ``move_piece`` / ``clear_cell``
-  would encode writes. Every caller keeps working against the same public
-  interface.
-
-* Custom games / custom piece sets: ``valid_colors`` and
-  ``valid_piece_types`` are constructor parameters (with the standard
-  chess rule-set as their default). The board never hard-codes which
-  colors or piece types are legal, so a "design your own game" feature can
-  build a Board with a different rule-set without any change here.
-  Movement, promotion, and game-over rules are configured on ``Game`` and
-  ``MovementRules``, not on ``Board``.
-"""
+"""The game board."""
 
 try:
     from ..config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
-    from ..errors import EmptyBoardError, RowWidthMismatchError, UnknownTokenError
+    from ..errors import (
+        DuplicateOccupancyError,
+        DuplicatePieceIdError,
+        EmptyBoardError,
+        RowWidthMismatchError,
+        UnknownTokenError,
+    )
     from .piece import Piece
 except ImportError:
     from config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
-    from errors import EmptyBoardError, RowWidthMismatchError, UnknownTokenError
+    from errors import (
+        DuplicateOccupancyError,
+        DuplicatePieceIdError,
+        EmptyBoardError,
+        RowWidthMismatchError,
+        UnknownTokenError,
+    )
     from piece import Piece
 
 
@@ -40,6 +31,8 @@ class Board:
     ):
         self._valid_colors = valid_colors
         self._valid_piece_types = valid_piece_types
+        self._next_piece_id = 0
+        self._piece_ids = set()
         self._cells = self._build_cells(rows_of_tokens)
 
     def _build_cells(self, rows_of_tokens):
@@ -58,10 +51,31 @@ class Board:
         if token == EMPTY_CELL_TOKEN:
             return None
 
-        piece = Piece.from_token(token)
+        piece = Piece.from_token(token, piece_id=self._next_piece_id)
+        self._next_piece_id += 1
         if piece is None or not piece.is_valid(self._valid_colors, self._valid_piece_types):
             raise UnknownTokenError(token)
+        self._register_piece_id(piece.piece_id)
         return piece
+
+    def _register_piece_id(self, piece_id):
+        if piece_id in self._piece_ids:
+            raise DuplicatePieceIdError(piece_id)
+        self._piece_ids.add(piece_id)
+
+    def place_piece(self, row, col, piece):
+        """Place ``piece`` at ``(row, col)`` if the cell is empty.
+
+        Raises DuplicateOccupancyError when the cell is occupied and
+        DuplicatePieceIdError when ``piece.piece_id`` is already on the board.
+        """
+        if not self.in_bounds(row, col):
+            raise IndexError(f"Cell ({row}, {col}) is out of bounds")
+        if self._cells[row][col] is not None:
+            raise DuplicateOccupancyError(row, col)
+        if piece.piece_id is not None:
+            self._register_piece_id(piece.piece_id)
+        self._cells[row][col] = piece
 
     @property
     def num_rows(self):
@@ -77,40 +91,22 @@ class Board:
 
     def clear_cell(self, row, col):
         """Remove whatever occupies (row, col), leaving the cell empty."""
+        piece = self._cells[row][col]
+        if piece is not None and piece.piece_id is not None:
+            self._piece_ids.discard(piece.piece_id)
         self._cells[row][col] = None
 
     def in_bounds(self, row, col):
-        """Return True if (row, col) is a real cell on this board.
-
-        Centralizing this check here (rather than each caller re-deriving
-        it from num_rows/num_cols) keeps the board's own dimensions as the
-        single source of truth for what counts as "on the board".
-        """
         return 0 <= row < self.num_rows and 0 <= col < self.num_cols
 
     def move_piece(self, from_row, from_col, to_row, to_col, promotion_piece_type=None):
-        """Move whatever occupies (from_row, from_col) to (to_row, to_col).
-
-        The destination is simply overwritten (a capture), and the source
-        cell becomes empty. When ``promotion_piece_type`` is set the moving
-        piece is placed as that type (same color) instead of its original
-        type - used for pawn promotion on the last row.
-        """
         piece = self._cells[from_row][from_col]
         if promotion_piece_type is not None:
-            piece = Piece(color=piece.color, piece_type=promotion_piece_type)
+            piece = piece.with_piece_type(promotion_piece_type)
         self._cells[to_row][to_col] = piece
         self._cells[from_row][from_col] = None
 
     def render_rows(self):
-        """Return the board as a list of canonical row strings.
-
-        Each row is rebuilt from the validated Piece objects (or the empty
-        token), tokens separated by a single space. Because this reads
-        from validated internal state rather than the original raw input
-        text, the result is always normalized - this IS the "canonical
-        form" the assignment asks for.
-        """
         rows = []
         for row_cells in self._cells:
             tokens = [cell.token if cell is not None else EMPTY_CELL_TOKEN for cell in row_cells]

@@ -17,11 +17,17 @@ try:
 except ImportError:
     from config import TOKEN_LENGTH
 
+PIECE_STATE_IDLE = "idle"
+PIECE_STATE_MOVING = "moving"
+PIECE_STATE_CAPTURED = "captured"
+
 
 @dataclass(frozen=True)
 class Piece:
     color: str
     piece_type: str
+    piece_id: int | None = None
+    state: str = PIECE_STATE_IDLE
 
     def is_valid(self, valid_colors, valid_piece_types):
         """Check this piece against a caller-supplied rule-set."""
@@ -29,25 +35,36 @@ class Piece:
 
     @property
     def token(self):
-        """Canonical 2-character token for this piece, e.g. 'wP'.
-
-        This is reconstructed from the piece's validated state, not stored
-        from the original input string - so re-serializing a Board always
-        yields a normalized ("canonical") token, regardless of how the raw
-        input was spaced or formatted.
-        """
+        """Canonical 2-character token for this piece, e.g. 'wP'."""
         return f"{self.color}{self.piece_type}"
 
     @classmethod
-    def from_token(cls, token):
-        """Build a Piece from a token such as ``"wP"``.
-
-        Returns None if the token isn't shaped like a piece token at all
-        (wrong length). This is a purely structural check; whether the
-        resulting color/type are *actually* valid is decided by
-        ``is_valid`` against the active rule-set, not by this method.
-        """
+    def from_token(cls, token, piece_id=None, state=PIECE_STATE_IDLE):
+        """Build a Piece from a token such as ``"wP"``."""
         if len(token) != TOKEN_LENGTH:
             return None
         color, piece_type = token[0], token[1]
-        return cls(color=color, piece_type=piece_type)
+        return cls(
+            color=color,
+            piece_type=piece_type,
+            piece_id=piece_id,
+            state=state,
+        )
+
+    def with_state(self, state):
+        """Return a copy of this piece with an updated lifecycle state."""
+        return Piece(
+            color=self.color,
+            piece_type=self.piece_type,
+            piece_id=self.piece_id,
+            state=state,
+        )
+
+    def with_piece_type(self, piece_type):
+        """Return a copy of this piece with an updated type (e.g. promotion)."""
+        return Piece(
+            color=self.color,
+            piece_type=piece_type,
+            piece_id=self.piece_id,
+            state=self.state,
+        )

@@ -1,6 +1,7 @@
 import pytest
 
 from kongfu_chess.model.board import Board
+from kongfu_chess.model.piece import Piece
 from kongfu_chess.errors import (
     EmptyBoardError,
     RowWidthMismatchError,
@@ -118,3 +119,46 @@ def test_clear_cell_empties_a_cell():
     board = Board([["wK"]])
     board.clear_cell(0, 0)
     assert board.get_cell(0, 0) is None
+
+
+def test_board_assigns_unique_piece_ids_during_parsing():
+    board = Board([["wK", "wQ"], ["bK", "."]])
+    ids = {
+        board.get_cell(0, 0).piece_id,
+        board.get_cell(0, 1).piece_id,
+        board.get_cell(1, 0).piece_id,
+    }
+    assert ids == {0, 1, 2}
+
+
+def test_place_piece_on_empty_cell_succeeds():
+    board = Board([["."]])
+    piece = Piece.from_token("wK", piece_id=10)
+    board.place_piece(0, 0, piece)
+    assert board.get_cell(0, 0).piece_id == 10
+
+
+def test_place_piece_on_occupied_cell_raises_duplicate_occupancy():
+    from kongfu_chess.errors import DuplicateOccupancyError
+
+    board = Board([["wK", "."]])
+    piece = Piece.from_token("bK", piece_id=10)
+    with pytest.raises(DuplicateOccupancyError):
+        board.place_piece(0, 0, piece)
+
+
+def test_place_piece_with_duplicate_id_raises():
+    from kongfu_chess.errors import DuplicatePieceIdError
+
+    board = Board([["wK", "."]])
+    duplicate = Piece.from_token("bK", piece_id=board.get_cell(0, 0).piece_id)
+    with pytest.raises(DuplicatePieceIdError):
+        board.place_piece(0, 1, duplicate)
+
+
+def test_move_piece_preserves_piece_id():
+    board = Board([["wP", "."]])
+    original_id = board.get_cell(0, 0).piece_id
+    board.move_piece(0, 0, 0, 1, promotion_piece_type="Q")
+    assert board.get_cell(0, 1).piece_id == original_id
+    assert board.get_cell(0, 1).token == "wQ"

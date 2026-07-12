@@ -38,3 +38,23 @@ def test_piece_supports_custom_rule_sets_not_just_standard_chess():
 def test_token_reconstructs_canonical_two_character_form():
     piece = Piece.from_token("wP")
     assert piece.token == "wP"
+
+
+def test_piece_defaults_to_idle_state():
+    piece = Piece.from_token("wP")
+    assert piece.state == "idle"
+
+
+def test_with_state_returns_new_piece_with_updated_state():
+    piece = Piece.from_token("wP", piece_id=1)
+    moving = piece.with_state("moving")
+    assert moving.state == "moving"
+    assert moving.piece_id == 1
+    assert piece.state == "idle"
+
+
+def test_with_piece_type_preserves_piece_id():
+    piece = Piece.from_token("wP", piece_id=3)
+    promoted = piece.with_piece_type("Q")
+    assert promoted.token == "wQ"
+    assert promoted.piece_id == 3

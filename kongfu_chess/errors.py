@@ -48,3 +48,20 @@ class MissingSectionError(BoardParsingError):
     def __init__(self, header):
         self.header = header
         super().__init__(f"Missing required section header: {header!r}")
+
+
+class DuplicateOccupancyError(BoardParsingError):
+    code = ErrorCode.DUPLICATE_OCCUPANCY
+
+    def __init__(self, row, col):
+        self.row = row
+        self.col = col
+        super().__init__(f"Cell ({row}, {col}) is already occupied")
+
+
+class DuplicatePieceIdError(BoardParsingError):
+    code = ErrorCode.DUPLICATE_PIECE_ID
+
+    def __init__(self, piece_id):
+        self.piece_id = piece_id
+        super().__init__(f"Duplicate piece id: {piece_id}")

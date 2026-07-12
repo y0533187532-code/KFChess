@@ -76,10 +76,20 @@ def main():
     for name in MOVEMENT_FILES:
         shutil.copy2(PKG / "movement" / name, movement_out / name)
 
+    input_out = OUT / "input"
+    input_out.mkdir()
+    for name in ("__init__.py", "board_mapper.py", "controller.py"):
+        shutil.copy2(PKG / "input" / name, input_out / name)
+
+    model_out = OUT / "model"
+    model_out.mkdir()
+    for name in ("__init__.py", "position.py", "game_state.py"):
+        shutil.copy2(PKG / "model" / name, model_out / name)
+
     print(f"Created {OUT}")
     print("Upload these files to VPL:")
     print("  parser.py, config.py, errors.py, piece.py, board.py,")
-    print("  commands.py, game.py, movement/ (entire folder)")
+    print("  commands.py, game.py, movement/, input/, model/")
 
 
 if __name__ == "__main__":

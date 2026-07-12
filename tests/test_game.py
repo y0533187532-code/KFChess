@@ -18,9 +18,19 @@ def finish_move(game, ms=None):
         game.handle_wait(FULL_MOVE_WAIT_MS)
 
 
-def test_click_outside_the_board_is_ignored():
+def test_click_outside_the_board_is_ignored_when_nothing_is_selected():
     board, game = make_game([["wK"]])
     game.handle_click(-50, -50)
+    assert board.get_cell(0, 0).token == "wK"
+    assert game._selected is None
+
+
+def test_click_outside_the_board_clears_selection():
+    board, game = make_game([["wK", "."]])
+    game.handle_click(50, 50)
+    assert game._selected == (0, 0)
+    game.handle_click(350, 50)
+    assert game._selected is None
     assert board.get_cell(0, 0).token == "wK"
 
 
