@@ -102,6 +102,7 @@ def main():
     for name in (
         "__init__.py",
         "motion.py",
+        "collision.py",
         "real_time_arbiter.py",
         "arrival_resolver.py",
         "airborne_jump.py",

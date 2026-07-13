@@ -309,7 +309,7 @@ def test_grader_26_two_cell_move_before_and_after_arrival():
     )
 
 
-def test_grader_28_opposite_colors_do_not_move_concurrently_in_common_route():
+def test_grader_28_opposite_colors_parallel_horizontal_moves_both_complete():
     assert_output(
         " Board:\n"
         "wR . .\n"
@@ -322,7 +322,7 @@ def test_grader_28_opposite_colors_do_not_move_concurrently_in_common_route():
         "click 250 250\n"
         "wait 2000\n"
         "print board\n",
-        [". . wR", ". . .", "bR . ."],
+        [". . wR", ". . .", ". . bR"],
     )
 
 

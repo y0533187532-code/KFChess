@@ -105,12 +105,12 @@ def test_jump_landing_removes_motion_without_moving_piece():
 # --- Airborne capture ---
 
 
-def test_enemy_arriving_at_airborne_cell_is_captured():
+def test_enemy_arriving_at_airborne_origin_captures_jumper():
     board, _, engine = make_engine([["wK", "bR", "."]])
     engine.request_jump(0, 0)
     engine.request_move(0, 1, 0, 0)
     finish_jump(engine)
-    assert board.get_cell(0, 0).token == "wK"
+    assert board.get_cell(0, 0).token == "bR"
     assert board.get_cell(0, 1) is None
 
 

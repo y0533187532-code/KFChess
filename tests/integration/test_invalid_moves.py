@@ -2,7 +2,7 @@
 
 Each case documents which layer owns the rejection:
 - Controller: selection policy, out-of-bounds clicks
-- GameEngine: game_over, piece_in_motion, route_conflict; delegates rule checks to RuleEngine
+- GameEngine: game_over, piece_in_motion; delegates rule checks to RuleEngine
 - RuleEngine: outside_board, empty_source, friendly_destination,
   illegal_piece_move, path_blocked
 """
@@ -22,9 +22,7 @@ STABLE_RULE_REASONS = frozenset(
         "path_blocked",
     }
 )
-STABLE_ENGINE_REASONS = frozenset(
-    {"ok", "game_over", "route_conflict", "piece_in_motion"}
-)
+STABLE_ENGINE_REASONS = frozenset({"ok", "game_over", "piece_in_motion"})
 
 
 def make_game(rows):

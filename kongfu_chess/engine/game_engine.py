@@ -2,13 +2,12 @@
 
 Parallel movement policy: multiple *different* pieces may travel at once.
 The same piece cannot receive a second move or jump while it already has active
-motion (``piece_in_motion``). Other conflicts are rejected by ``is_route_conflict``.
-Arrival order, swap cancellation, and airborne jump capture are resolved by
-RealTimeArbiter.
+motion (``piece_in_motion``). Timed cell-entry collisions are resolved by
+RealTimeArbiter (enemy later-capture, same-color early stop).
 
 Airborne jump (conflict #4): same-cell re-click or ``jump`` command schedules
-a jump via ``RealTimeArbiter.schedule_jump``; capture-on-arrival to an airborne
-cell is handled in ``realtime.airborne_jump``.
+a jump via ``RealTimeArbiter.schedule_jump``; origin occupancy uses the same
+timed collision rules as travel.
 """
 
 try:
@@ -24,8 +23,6 @@ try:
     from ..rules import (
         RuleEngine,
         get_move_route,
-        is_route_conflict,
-        is_swap_route,
         resolve_promotion_piece_type,
     )
 except ImportError:
@@ -41,8 +38,6 @@ except ImportError:
     from rules import (
         RuleEngine,
         get_move_route,
-        is_route_conflict,
-        is_swap_route,
         resolve_promotion_piece_type,
     )
 
@@ -135,25 +130,10 @@ class GameEngine:
         piece = self._board.get_cell(from_row, from_col)
         new_route = get_move_route(from_row, from_col, to_row, to_col, piece.piece_type)
         new_from = (from_row, from_col)
-        new_to = (to_row, to_col)
-
-        for existing in self.active_moves:
-            if is_route_conflict(
-                existing["from"],
-                existing["to"],
-                existing["route"],
-                new_from,
-                new_to,
-                new_route,
-                existing["color"],
-                piece.color,
-                existing_jump=existing.get("jump", False),
-            ):
-                return MoveResult(is_accepted=False, reason="route_conflict")
 
         self._arbiter.schedule_travel(
             new_from,
-            new_to,
+            (to_row, to_col),
             self._move_durations[piece.piece_type] * len(new_route),
             new_route,
             piece.color,
@@ -225,9 +205,14 @@ class GameEngine:
         self._board.clear_cell(from_row, from_col)
 
     def execute_move(self, move):
-        from_row, from_col = move["from"]
         to_row, to_col = move["to"]
+        self.execute_move_to_cell(move, to_row, to_col)
+
+    def execute_move_to_cell(self, move, to_row, to_col):
+        from_row, from_col = move["from"]
         moving = self._board.get_cell(from_row, from_col)
+        if moving is None:
+            return
         promotion = self._resolve_promotion(moving, to_row)
         result = apply_arrival(
             self._board,
@@ -241,21 +226,33 @@ class GameEngine:
         )
         if result.captured_piece is not None:
             self._state.record_capture(result.captured_piece, to_row, to_col)
+            self._cancel_motions_from(to_row, to_col)
         if result.king_captured:
             self._state.mark_game_over()
 
-    def can_execute_move(self, move, completed_moves):
-        for other in self.active_moves:
-            if other is move:
-                continue
-            if self._is_swap_with_lower_order(move, other):
-                return False
+    def _cancel_motions_from(self, row, col):
+        for motion in list(self._arbiter.active_moves):
+            if motion["from"] == (row, col):
+                self.cancel_motion(motion, captured_at=(row, col))
 
-        for other in completed_moves:
-            if self._is_swap_with_lower_order(move, other):
-                return False
+    def cancel_motion(self, motion, captured_at=None):
+        try:
+            from ..realtime.collision import clear_motion_transit
+        except ImportError:
+            from realtime.collision import clear_motion_transit
 
-        return True
+        clear_motion_transit(motion)
+        from_row, from_col = motion["from"]
+        piece = self._board.get_cell(from_row, from_col)
+        if piece is not None and piece.color == motion["color"]:
+            if captured_at is not None:
+                cap_row, cap_col = captured_at
+                self._state.record_capture(
+                    piece.with_state(PIECE_STATE_CAPTURED), cap_row, cap_col
+                )
+            self._board.clear_cell(from_row, from_col)
+        while motion in self._arbiter.active_moves:
+            self._arbiter.active_moves.remove(motion)
 
     def _resolve_promotion(self, moving, to_row):
         chosen_type = self._state.promotion_choice
@@ -276,16 +273,3 @@ class GameEngine:
         if promotion is not None:
             self._state.consume_promotion_choice()
         return promotion
-
-    def _is_swap_with_lower_order(self, move, other):
-        return (
-            is_swap_route(
-                move["from"],
-                move["to"],
-                move["color"],
-                other["from"],
-                other["to"],
-                other["color"],
-            )
-            and other["order"] < move["order"]
-        )

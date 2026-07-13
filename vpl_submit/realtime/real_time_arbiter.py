@@ -1,17 +1,21 @@
 """Deterministic virtual-time resolution for in-flight motions."""
 
 try:
-    from .airborne_jump import (
-        collect_airborne_jumps,
-        is_captured_by_airborne_jump,
-        is_jump_motion,
+    from .airborne_jump import is_jump_motion
+    from .collision import (
+        clear_motion_transit,
+        collect_cell_entry_events,
+        motion_total_ms,
+        resolve_travel_cell_entry,
     )
     from .motion import make_jump_motion, make_travel_motion
 except ImportError:
-    from realtime.airborne_jump import (
-        collect_airborne_jumps,
-        is_captured_by_airborne_jump,
-        is_jump_motion,
+    from realtime.airborne_jump import is_jump_motion
+    from collision import (
+        clear_motion_transit,
+        collect_cell_entry_events,
+        motion_total_ms,
+        resolve_travel_cell_entry,
     )
     from realtime.motion import make_jump_motion, make_travel_motion
 
@@ -35,83 +39,78 @@ class RealTimeArbiter:
         return {move["from"] for move in self._active_moves}
 
     def schedule_travel(self, from_pos, to_pos, remaining_ms, route, color):
+        cell_ms = remaining_ms // max(1, len(route))
         motion = make_travel_motion(
             from_pos, to_pos, remaining_ms, self._next_order, route, color
         )
+        motion["cell_ms"] = cell_ms
+        motion["total_ms"] = remaining_ms
         self._active_moves.append(motion)
         self._next_order += 1
         return motion
 
     def schedule_jump(self, from_pos, remaining_ms, color):
         motion = make_jump_motion(from_pos, remaining_ms, self._next_order, color)
+        motion["total_ms"] = remaining_ms
         self._active_moves.append(motion)
         self._next_order += 1
         return motion
 
     def advance_time(self, milliseconds):
-        """Tick all motions and resolve arrivals in deterministic order."""
+        """Tick all motions and resolve timed cell entries plus jump landings."""
         if milliseconds < 0:
             milliseconds = 0
 
-        finished = []
+        events = []
+        seen_motion_ids = set()
 
-        for move in self._active_moves:
-            old_remaining = move["remaining"]
-            move["remaining"] = old_remaining - milliseconds
-            if move["remaining"] <= 0:
-                finished.append({"move": move, "finish_time": old_remaining})
+        for move in list(self._active_moves):
+            move_id = id(move)
+            if move_id in seen_motion_ids:
+                continue
+            seen_motion_ids.add(move_id)
 
-        finished.sort(key=lambda item: (item["finish_time"], item["move"]["order"]))
+            if is_jump_motion(move):
+                finish_time = move["remaining"]
+                move["remaining"] = finish_time - milliseconds
+                if move["remaining"] <= 0:
+                    events.append((finish_time, move["order"], "jump_end", move))
+                continue
 
-        completed = []
-        index = 0
-        while index < len(finished):
-            finish_time = finished[index]["finish_time"]
-            group_end = index
-            while (
-                group_end < len(finished)
-                and finished[group_end]["finish_time"] == finish_time
+            total_ms = motion_total_ms(move)
+            move["remaining"] = max(0, move["remaining"] - milliseconds)
+            elapsed_after = total_ms - move["remaining"]
+            for entry_time, route_index, cell in collect_cell_entry_events(
+                move, elapsed_after
             ):
-                group_end += 1
+                events.append(
+                    (entry_time, move["order"], "cell_entry", move, route_index, cell)
+                )
 
-            group = finished[index:group_end]
-            group_moves = [entry["move"] for entry in group]
-            airborne_jumps = collect_airborne_jumps(group_moves, self._active_moves)
+        events.sort(key=lambda item: (item[0], item[1]))
 
-            for entry in group:
-                move = entry["move"]
-                if move not in self._active_moves or is_jump_motion(move):
-                    continue
-                if is_captured_by_airborne_jump(move, airborne_jumps):
-                    from_row, from_col = move["from"]
-                    self._executor.clear_source_cell(from_row, from_col)
-                    self._remove_active_move(move)
-                    completed.append(move)
+        for event in events:
+            kind = event[2]
+            move = event[3]
+            if move not in self._active_moves:
+                continue
 
-            for entry in group:
-                move = entry["move"]
-                if move not in self._active_moves:
-                    continue
+            if kind == "jump_end":
+                clear_motion_transit(move)
+                self._complete_jump(move)
+                continue
 
-                if is_jump_motion(move):
-                    self._complete_jump(move)
-                    completed.append(move)
-                    continue
-
-                if not self._executor.can_execute_move(move, completed):
-                    self._remove_active_move(move)
-                    continue
-
-                self._executor.execute_move(move)
+            route_index, cell = event[4], event[5]
+            if resolve_travel_cell_entry(
+                self._executor, move, route_index, cell, self._active_moves
+            ):
                 self._remove_active_move(move)
-                completed.append(move)
-
-            index = group_end
 
     def _complete_jump(self, move):
         """End an airborne jump; logical board occupancy is unchanged."""
         self._remove_active_move(move)
 
     def _remove_active_move(self, move):
+        clear_motion_transit(move)
         while move in self._active_moves:
             self._active_moves.remove(move)

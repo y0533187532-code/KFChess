@@ -39,6 +39,6 @@ def test_prepare_vpl_submit_generates_layered_package():
     assert "MissingPromotionChoiceError" in main_py
     assert "InvalidPromotionTypeError" in main_py
     assert 'if __name__ == "__main__"' in main_py
-    assert "airborne_jump.py" in {
+    assert "collision.py" in {
         path.name for path in (out / "realtime").glob("*.py")
     }

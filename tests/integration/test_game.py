@@ -167,18 +167,18 @@ def test_handle_wait_with_no_pending_move_is_safe():
     assert board.get_cell(0, 0).token == "wK"
 
 
-def test_conflicting_premove_is_rejected_while_piece_is_moving():
+def test_conflicting_premove_resolved_by_timed_collision():
     rows = [["wR", ".", "bR"]]
     board, game = make_game(rows)
     game.handle_click(50, 50)    # select white rook at (0, 0)
-    game.handle_click(250, 50)   # wR starts moving to (0, 2) — route includes (0,1),(0,2)
+    game.handle_click(250, 50)   # wR starts moving to (0, 2)
     assert board.get_cell(0, 0).token == "wR"
     game.handle_click(250, 50)   # select black rook at (0, 2)
-    game.handle_click(150, 50)   # bR tries (0, 1) — overlaps white route
+    game.handle_click(150, 50)   # bR → (0, 1) — same-time crossing on white route
     finish_move(game)
     assert board.get_cell(0, 0) is None
-    assert board.get_cell(0, 2).token == "wR"
-    assert board.get_cell(0, 1) is None
+    assert board.get_cell(0, 1).token == "bR"
+    assert board.get_cell(0, 2) is None
 
 
 def test_two_non_conflicting_moves_can_be_active_simultaneously():
@@ -195,17 +195,17 @@ def test_two_non_conflicting_moves_can_be_active_simultaneously():
     assert board.get_cell(0, 2).token == "bK"
 
 
-def test_invalid_premove_rejected_when_landing_on_active_origin():
+def test_enemy_landing_on_active_origin_captures_at_crossing_cell():
     rows = [["wR", ".", "bR"]]
     board, game = make_game(rows)
     game.handle_click(50, 50)    # wR at (0,0) starts moving right
     game.handle_click(250, 50)   # wR → (0, 2)
     game.handle_click(250, 50)   # select bR at (0,2)
-    game.handle_click(50, 50)    # bR tries to land on (0,0) — white origin
+    game.handle_click(50, 50)    # bR → (0,0)
     finish_move(game)
     assert board.get_cell(0, 0) is None
-    assert board.get_cell(0, 2).token == "wR"
-    assert board.get_cell(0, 1) is None
+    assert board.get_cell(0, 1).token == "bR"
+    assert board.get_cell(0, 2) is None
 
 
 def test_cannot_select_piece_whose_origin_is_currently_moving():
@@ -216,29 +216,29 @@ def test_cannot_select_piece_whose_origin_is_currently_moving():
     assert board.get_cell(0, 0).token == "wR"
 
 
-def test_enemy_swap_premoves_are_both_accepted():
+def test_enemy_swap_first_arrival_captures_and_cancels_partner():
     board, game = make_game([["wK", "bK"]])
     game.handle_click(50, 50)    # wK at (0,0)
     game.handle_click(150, 50)   # wK → (0,1) — order 0
     game.handle_click(150, 50)   # bK at (0,1)
-    game.handle_click(50, 50)    # bK → (0,0) — order 1, swap premove
+    game.handle_click(50, 50)    # bK → (0,0) — order 1
     finish_move(game)
-    # Lower order (wK) executes; higher-order swap partner is cancelled
     assert board.get_cell(0, 0) is None
     assert board.get_cell(0, 1).token == "wK"
 
 
-def test_friendly_route_conflict_rejected():
+def test_friendly_crossing_stops_later_piece_before_conflict():
     rows = [["wR", ".", ".", "wQ"]]
     board, game = make_game(rows)
     game.handle_click(50, 50)    # wR at (0,0) moving to (0,2)
     game.handle_click(250, 50)
     game.handle_click(350, 50)   # select wQ at (0,3)
-    game.handle_click(150, 50)   # wQ tries (0,1) — overlaps rook route
+    game.handle_click(150, 50)   # wQ → (0,1)
     finish_move(game)
     assert board.get_cell(0, 0) is None
-    assert board.get_cell(0, 2).token == "wR"
-    assert board.get_cell(0, 3).token == "wQ"
+    assert board.get_cell(0, 1).token == "wR"
+    assert board.get_cell(0, 2).token == "wQ"
+    assert board.get_cell(0, 3) is None
 
 
 def test_cannot_reselect_friendly_at_moving_origin():
@@ -272,7 +272,7 @@ def test_stale_selection_cleared_when_origin_is_moving():
     assert board.get_cell(0, 0).token == "wR"
 
 
-def test_higher_order_swap_cancelled_while_lower_order_still_active():
+def test_higher_order_arrival_captures_enemy_still_at_origin():
     board, game = make_game([["wK", "bK"]])
     game.handle_click(50, 50)
     game.handle_click(150, 50)   # wK → (0, 1), order 0, still in-flight
@@ -284,14 +284,16 @@ def test_higher_order_swap_cancelled_while_lower_order_still_active():
             "order": 1,
             "route": [(0, 0)],
             "color": "b",
+            "cell_ms": 1000,
+            "total_ms": 1000,
         }
     )
-    game.handle_wait(0)          # bK tries to finish while wK still active
-    assert board.get_cell(0, 0).token == "wK"
-    assert board.get_cell(0, 1).token == "bK"
+    game.handle_wait(0)
+    assert board.get_cell(0, 0).token == "bK"
+    assert board.get_cell(0, 1) is None
     finish_move(game)
-    assert board.get_cell(0, 1).token == "wK"
-    assert board.get_cell(0, 0) is None
+    assert board.get_cell(0, 0).token == "bK"
+    assert board.get_cell(0, 1) is None
 
 
 def test_partial_wait_does_not_complete_move():
@@ -318,7 +320,7 @@ def test_two_cell_move_duration_scales_with_route_length():
     assert board.get_cell(0, 2).token == "wR"
 
 
-def test_opposite_colors_cannot_queue_parallel_moves_in_common_route():
+def test_opposite_colors_parallel_horizontal_moves_both_complete():
     rows = [["wR", ".", "."], [".", ".", "."], ["bR", ".", "."]]
     board, game = make_game(rows)
     game.handle_click(50, 50)
@@ -327,8 +329,8 @@ def test_opposite_colors_cannot_queue_parallel_moves_in_common_route():
     game.handle_click(250, 250)
     finish_move(game, ms=2000)
     assert board.get_cell(0, 2).token == "wR"
-    assert board.get_cell(2, 0).token == "bR"
-    assert board.get_cell(2, 2) is None
+    assert board.get_cell(2, 2).token == "bR"
+    assert board.get_cell(2, 0) is None
 
 
 def test_piece_can_move_again_immediately_after_arrival():
