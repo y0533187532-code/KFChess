@@ -84,7 +84,7 @@ def test_wait_delegates_to_arbiter_without_board_change_mid_flight():
 
 
 def test_parallel_non_conflicting_moves_both_accepted_while_in_flight():
-    """No motion_in_progress guard — second move may start during first."""
+    """Different pieces may move in parallel; same-piece guard is separate."""
     board, _, engine = make_engine([["wK", ".", ".", "bK"]])
     first = engine.request_move(0, 0, 0, 1)
     second = engine.request_move(0, 3, 0, 2)
@@ -147,3 +147,47 @@ def test_snapshot_marks_captured_victim_after_arrival():
     assert captured.state == PIECE_STATE_CAPTURED
     assert captured.row == 0 and captured.col == 1
     assert next(p for p in after.pieces if p.piece_id == attacker_id).state == PIECE_STATE_IDLE
+
+
+def test_request_move_rejects_second_move_while_piece_is_travelling():
+    board, _, engine = make_engine([["wK", ".", "."]])
+    first = engine.request_move(0, 0, 0, 1)
+    second = engine.request_move(0, 0, 1, 0)
+    assert first == MoveResult(is_accepted=True, reason="ok")
+    assert second == MoveResult(is_accepted=False, reason="piece_in_motion")
+    assert len(engine.active_moves) == 1
+
+
+def test_request_jump_rejects_second_jump_while_airborne():
+    board, _, engine = make_engine([["wK"]])
+    first = engine.request_jump(0, 0)
+    second = engine.request_jump(0, 0)
+    assert first == MoveResult(is_accepted=True, reason="ok")
+    assert second == MoveResult(is_accepted=False, reason="piece_in_motion")
+    assert len(engine.active_moves) == 1
+
+
+def test_request_move_rejects_while_same_piece_is_jumping():
+    board, _, engine = make_engine([["wK", "."]])
+    assert engine.request_jump(0, 0) == MoveResult(is_accepted=True, reason="ok")
+    result = engine.request_move(0, 0, 0, 1)
+    assert result == MoveResult(is_accepted=False, reason="piece_in_motion")
+    assert len(engine.active_moves) == 1
+
+
+def test_request_jump_rejects_while_same_piece_is_travelling():
+    board, _, engine = make_engine([["wK", "."]])
+    assert engine.request_move(0, 0, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    result = engine.request_jump(0, 0)
+    assert result == MoveResult(is_accepted=False, reason="piece_in_motion")
+    assert len(engine.active_moves) == 1
+
+
+def test_piece_may_move_again_after_motion_completes():
+    board, _, engine = make_engine([["wK", ".", "."]])
+    assert engine.request_move(0, 0, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    engine.wait(1000)
+    assert engine.active_moves == []
+    result = engine.request_move(0, 1, 0, 2)
+    assert result == MoveResult(is_accepted=True, reason="ok")
+    assert len(engine.active_moves) == 1

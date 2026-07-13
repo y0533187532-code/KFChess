@@ -1,9 +1,10 @@
 """Application-service command boundary for move requests and time.
 
-Parallel movement policy (conflict #1): multiple pieces may travel at once.
-There is no global ``motion_in_progress`` guard — new moves start while others
-are in flight unless ``is_route_conflict`` rejects the request. Arrival order,
-swap cancellation, and airborne jump capture are resolved by RealTimeArbiter.
+Parallel movement policy: multiple *different* pieces may travel at once.
+The same piece cannot receive a second move or jump while it already has active
+motion (``piece_in_motion``). Other conflicts are rejected by ``is_route_conflict``.
+Arrival order, swap cancellation, and airborne jump capture are resolved by
+RealTimeArbiter.
 
 Airborne jump (conflict #4): same-cell re-click or ``jump`` command schedules
 a jump via ``RealTimeArbiter.schedule_jump``; capture-on-arrival to an airborne
@@ -122,6 +123,9 @@ class GameEngine:
         if self._state.is_game_over:
             return MoveResult(is_accepted=False, reason="game_over")
 
+        if (from_row, from_col) in self.moving_origins():
+            return MoveResult(is_accepted=False, reason="piece_in_motion")
+
         validation = self._rule_engine.validate_move(
             self._board, from_row, from_col, to_row, to_col
         )
@@ -159,6 +163,9 @@ class GameEngine:
     def request_jump(self, from_row, from_col):
         if self._state.is_game_over:
             return MoveResult(is_accepted=False, reason="game_over")
+
+        if (from_row, from_col) in self.moving_origins():
+            return MoveResult(is_accepted=False, reason="piece_in_motion")
 
         piece = self._board.get_cell(from_row, from_col)
         if piece is None:
