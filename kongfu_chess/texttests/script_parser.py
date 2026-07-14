@@ -36,5 +36,5 @@ class InputParser:
         raise MissingSectionError(header)
 
 
-class ScriptParser(InputParser):
-    """Alias for the text integration DSL parser (DOCX ``ScriptParser``)."""
+# class ScriptParser(InputParser):
+#     """Alias for the text integration DSL parser (DOCX ``ScriptParser``)."""

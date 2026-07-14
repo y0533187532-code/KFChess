@@ -11,7 +11,7 @@ class BoardParser:
     def parse(self, raw_text):
         """Return a Board parsed from raw_text."""
         board_rows, _command_lines = self._input_parser.parse(raw_text)
-        return Board(board_rows)
+        return self.parse_rows(board_rows)
 
     def parse_rows(self, board_rows):
         """Return a Board from pre-split row tokens."""
