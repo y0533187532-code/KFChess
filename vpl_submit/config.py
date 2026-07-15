@@ -97,6 +97,16 @@ DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE = {
     "P": 2000,
 }
 
+# --- Capture score values by piece type ---
+PIECE_SCORE_VALUES = {
+    "P": 1,
+    "N": 3,
+    "B": 3,
+    "R": 5,
+    "Q": 9,
+    "K": 0,
+}
+
 class ErrorCode:
     """String codes reported to the caller on parsing failures."""
     EMPTY_BOARD = "EMPTY_BOARD"

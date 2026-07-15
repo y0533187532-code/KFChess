@@ -1,6 +1,7 @@
 from .animation import Animation
-from .board_view import cell_to_pixels, load_board
-from .img import Img
+from .board.board_coordinates import cell_to_pixels
+from .board.board_assets import load_board
+from .core.img import Img
 
 def show_idle_animation() -> None:
     """Display the white king's idle animation until Escape is pressed."""

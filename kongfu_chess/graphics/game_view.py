@@ -1,18 +1,17 @@
 from kongfu_chess.engine.types import GameSnapshot
 from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
-from .move_log import MoveLog
-from .board_view import (
-    cell_to_pixels,
+from .layout.move_log import MoveLog
+from .board.board_view import (
     draw_legal_destination,
     draw_rest_timer,
     draw_selection,
     load_board,
-    piece_token_to_asset_name,
 )
-from .img import Img
-from .piece_animator import PieceAnimator
-from .player_panel import PlayerPanel
-from .screen_layout import (
+from .core.img import Img
+from .pieces.piece_animation_manager import PieceAnimationManager
+from .pieces.piece_positioner import PiecePositioner
+from .layout.player_panel import PlayerPanel
+from .layout.screen_layout import (
     build_screen_canvas,
     draw_board_on_screen,
     draw_side_panel_text,
@@ -39,10 +38,15 @@ class GameView:
     }
 
     def __init__(self):
-        self._animators_by_piece_id: dict[int, PieceAnimator] = {}
+        self._animation_manager = PieceAnimationManager()
+        self._positioner = PiecePositioner()
         self._move_log = MoveLog()
         self._frame_index = 0
         self._player_panel = PlayerPanel()
+
+    @property
+    def _animators_by_piece_id(self):
+        return self._animation_manager.animators_by_piece_id
 
     def render(self, snapshot: GameSnapshot, active_moves: list[dict] | None = None) -> Img:
         """Draw the full board from a read-only snapshot."""
@@ -53,15 +57,15 @@ class GameView:
         for piece in snapshot.pieces:
             if piece.state == PIECE_STATE_CAPTURED:
                 continue
-            animator = self._get_or_create_animator(
+
+            current_frame = self._animation_manager.frame_for(
                 piece.piece_id,
                 piece.token,
                 self._asset_state_for(piece.state),
             )
-            current_frame = animator.frame_at()
-            active_move = self._find_active_move_for_piece(piece, active_moves)
+            active_move = self._positioner.find_active_move_for_piece(piece, active_moves)
 
-            x, y = self._pixel_position_for_piece(piece, active_move)
+            x, y = self._positioner.pixel_position_for_piece(piece, active_move)
             current_frame.draw_on(board, x, y)
             if piece.rest_remaining_ms is not None:
                 draw_rest_timer(
@@ -96,68 +100,3 @@ class GameView:
     def _asset_state_for(self, state: str) -> str:
         """Map logical piece states to the available asset state folders."""
         return self._STATE_TO_ASSET_STATE.get(state, "idle")
-
-    def _get_or_create_animator(
-        self,
-        piece_id: int,
-        piece_token: str,
-        state: str,
-    ) -> PieceAnimator:
-        """Return the animator for one piece, creating or updating it if needed."""
-        piece_name = piece_token_to_asset_name(piece_token)
-        animator = self._animators_by_piece_id.get(piece_id)
-
-        if animator is None:
-            animator = PieceAnimator(piece_name, state)
-            self._animators_by_piece_id[piece_id] = animator
-            return animator
-
-        if animator.piece_name != piece_name:
-            animator = PieceAnimator(piece_name, state)
-            self._animators_by_piece_id[piece_id] = animator
-            return animator
-
-        if animator.state_name != state:
-            animator.change_state(state)
-
-        return animator
-
-    def _find_active_move_for_piece(
-        self,
-        piece,
-        active_moves: list[dict],
-    ) -> dict | None:
-        """Return the active motion record for this piece, if it exists."""
-        for move in active_moves:
-            move_row, move_col = move["from"]
-            if (piece.row, piece.col) == (move_row, move_col):
-                return move
-        return None
-
-    def _pixel_position_for_piece(
-        self,
-        piece,
-        active_move: dict | None,
-    ) -> tuple[int, int]:
-        """Return the top-left pixel position for the piece on the board."""
-        if active_move is None:
-            return cell_to_pixels(piece.row, piece.col)
-
-        from_row, from_col = active_move["from"]
-        to_row, to_col = active_move["to"]
-
-        start_x, start_y = cell_to_pixels(from_row, from_col)
-        end_x, end_y = cell_to_pixels(to_row, to_col)
-
-        total_ms = active_move["total_ms"]
-        remaining_ms = active_move["remaining"]
-        if total_ms <= 0:
-            return cell_to_pixels(piece.row, piece.col)
-        elapsed_ms = total_ms - remaining_ms
-
-        progress = elapsed_ms / total_ms
-        progress = max(0.0, min(1.0, progress))
-        x = int(start_x + (end_x - start_x) * progress)
-        y = int(start_y + (end_y - start_y) * progress)
-
-        return x, y

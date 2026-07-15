@@ -1,8 +1,10 @@
 import json
 import time
 
-from .board_view import CELL_SIZE_PX, PIECES_PATH
-from .img import Img
+from kongfu_chess.config import CELL_SIZE_PX
+
+from .board.board_assets import PIECES_PATH
+from .core.img import Img
 
 
 class Animation:

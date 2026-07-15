@@ -5,8 +5,8 @@ from kongfu_chess.game import Game
 from kongfu_chess.model.board import Board
 
 from .game_view import GameView
-from .img import Img
-from .screen_layout import screen_to_board_pixels
+from .core.img import Img
+from .layout.screen_layout import screen_to_board_pixels
 
 
 SAMPLE_BOARD_SIZE = 8
