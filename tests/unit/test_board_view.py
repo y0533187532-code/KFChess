@@ -5,6 +5,8 @@ from kongfu_chess.graphics.board_view import (
     DEMO_INITIAL_LAYOUT,
     build_demo_board,
     cell_to_pixels,
+    draw_legal_destination,
+    draw_rest_timer,
     draw_selection,
     draw_piece,
     load_board,
@@ -15,6 +17,7 @@ from kongfu_chess.graphics.board_view import (
 )
 from kongfu_chess.graphics.img import Img
 from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
+from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 
 
 def test_board_asset_exists():
@@ -91,6 +94,28 @@ def test_render_snapshot_draws_piece_from_snapshot_token():
     assert board.img is not None
 
 
+def test_render_snapshot_skips_captured_pieces():
+    empty_board = load_board()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        pieces=(
+            PieceSnapshot(
+                row=7,
+                col=4,
+                token="wK",
+                piece_id=1,
+                state=PIECE_STATE_CAPTURED,
+            ),
+        ),
+    )
+
+    board = render_snapshot(snapshot)
+
+    assert (board.img == empty_board.img).all()
+
+
 def test_draw_selection_changes_board_border_pixels():
     board = load_board()
     x, y = cell_to_pixels(7, 4)
@@ -100,3 +125,27 @@ def test_draw_selection_changes_board_border_pixels():
 
     assert (before[y, x] != board.img[y, x]).any()
     assert (before[y + CELL_SIZE_PX - 1, x + CELL_SIZE_PX - 1] != board.img[y + CELL_SIZE_PX - 1, x + CELL_SIZE_PX - 1]).any()
+
+
+def test_draw_rest_timer_draws_partial_countdown_overlay():
+    board = load_board()
+    x, y = cell_to_pixels(6, 3)
+    top_pixel_before = board.img[y, x].copy()
+    lower_pixel_before = board.img[y + CELL_SIZE_PX - 1, x].copy()
+
+    draw_rest_timer(board, 6, 3, remaining_ms=1000, total_ms=2000)
+
+    assert (board.img[y, x] == top_pixel_before).all()
+    assert (board.img[y + CELL_SIZE_PX - 1, x] != lower_pixel_before).any()
+    assert board.img[y + CELL_SIZE_PX - 1, x][2] < lower_pixel_before[2]
+
+
+def test_draw_legal_destination_adds_green_overlay_to_square():
+    board = load_board()
+    x, y = cell_to_pixels(6, 3)
+    before = board.img[y, x].copy()
+
+    draw_legal_destination(board, 6, 3)
+
+    after = board.img[y, x]
+    assert after[1] > before[1]

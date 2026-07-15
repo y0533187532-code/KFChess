@@ -46,6 +46,9 @@ class RealTimeArbiter:
     def is_piece_resting(self, piece_id):
         return piece_id in self._active_rests
 
+    def rest_remaining_ms(self, piece_id):
+        return self._active_rests.get(piece_id)
+
     def start_rest(self, piece_id, remaining_ms):
         if piece_id is None or remaining_ms <= 0:
             return

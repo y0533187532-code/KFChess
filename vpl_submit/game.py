@@ -20,6 +20,7 @@ class Game:
         rule_engine=None,
         move_durations=None,
         jump_duration_ms=None,
+        rest_durations=None,
         promotion_policy=None,
         game_over_piece_type=None,
     ):
@@ -33,6 +34,7 @@ class Game:
             rule_engine=rule_engine,
             move_durations=move_durations,
             jump_duration_ms=jump_duration_ms,
+            rest_durations=rest_durations,
             promotion_policy=promotion_policy,
             game_over_piece_type=game_over_piece_type,
         )

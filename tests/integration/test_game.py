@@ -339,8 +339,9 @@ def test_piece_can_move_again_immediately_after_arrival():
     game.handle_click(150, 50)  # move to (0, 1)
     finish_move(game)
     assert board.get_cell(0, 1).token == "wK"
+    game.handle_wait(2000)
     game.handle_click(150, 50)  # select at destination
-    game.handle_click(250, 50)  # move to (0, 2) - no cooldown wait needed
+    game.handle_click(250, 50)  # move to (0, 2) after rest
     finish_move(game)
     assert board.get_cell(0, 2).token == "wK"
 
@@ -537,6 +538,7 @@ def test_promoted_queen_can_move_as_queen():
     game.handle_click(150, 50)
     finish_move(game)
     assert board.get_cell(0, 1).token == "wQ"
+    game.handle_wait(2000)
     game.handle_click(150, 50)   # select promoted queen
     game.handle_click(50, 50)    # queen diagonal move to (0, 0)
     finish_move(game)

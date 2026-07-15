@@ -4,6 +4,7 @@ from kongfu_chess.graphics.game_view import GameView
 from kongfu_chess.graphics.img import Img
 from kongfu_chess.graphics.piece_animator import PieceAnimator
 from kongfu_chess.graphics.screen_layout import BOARD_X_PX, BOARD_Y_PX
+from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 
 
 def test_render_returns_img_board():
@@ -112,6 +113,20 @@ def test_render_maps_moving_state_to_move_assets():
     assert view._animators_by_piece_id[4].state_name == "move"
 
 
+def test_render_maps_resting_state_to_long_rest_assets():
+    view = GameView()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        pieces=(PieceSnapshot(row=6, col=3, token="wP", piece_id=4, state="resting"),),
+    )
+
+    view.render(snapshot)
+
+    assert view._animators_by_piece_id[4].state_name == "long_rest"
+
+
 def test_unknown_state_falls_back_to_idle_assets():
     view = GameView()
     snapshot = GameSnapshot(
@@ -179,3 +194,41 @@ def test_render_draws_selection_when_snapshot_has_selected_cell():
     x, y = cell_to_pixels(7, 4)
 
     assert tuple(board.img[BOARD_Y_PX + y, BOARD_X_PX + x]) == (0, 255, 255, 255)
+
+
+def test_render_draws_legal_destination_overlay():
+    view = GameView()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        legal_destinations=((6, 3),),
+        pieces=(PieceSnapshot(row=7, col=4, token="wK", piece_id=1),),
+    )
+
+    board = view.render(snapshot)
+    x, y = cell_to_pixels(6, 3)
+
+    assert board.img[BOARD_Y_PX + y, BOARD_X_PX + x][1] > 0
+
+
+def test_render_skips_captured_pieces():
+    view = GameView()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        pieces=(
+            PieceSnapshot(
+                row=7,
+                col=4,
+                token="wK",
+                piece_id=1,
+                state=PIECE_STATE_CAPTURED,
+            ),
+        ),
+    )
+
+    view.render(snapshot)
+
+    assert view._animators_by_piece_id == {}

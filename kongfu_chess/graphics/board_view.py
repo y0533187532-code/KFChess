@@ -1,7 +1,7 @@
 """Board and piece rendering helpers built on top of the supplied Img class."""
 
 from pathlib import Path
-
+from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 from kongfu_chess.config import CELL_SIZE_PX
 from kongfu_chess.engine.types import GameSnapshot
 
@@ -12,6 +12,15 @@ ASSETS_PATH = Path(__file__).resolve().parents[1] / "assets"
 BOARD_PATH = ASSETS_PATH / "board.png"
 PIECES_PATH = ASSETS_PATH / "pieces"
 
+REST_TIMER_BAR_HEIGHT_PX = 14
+REST_TIMER_COLOR = (255, 210, 0, 255)
+REST_TIMER_BACKGROUND_COLOR = (25, 25, 25, 255)
+REST_TIMER_BORDER_COLOR = (255, 255, 255, 255)
+REST_TIMER_BORDER_PX = 2
+REST_COUNTDOWN_OVERLAY_COLOR = (255, 210, 0, 255)
+REST_COUNTDOWN_OVERLAY_ALPHA = 0.30
+LEGAL_DESTINATION_OVERLAY_COLOR = (0, 255, 0, 90)
+LEGAL_DESTINATION_ALPHA = 0.35
 BOARD_CELLS_PER_SIDE = 8
 BOARD_SIZE_PX = CELL_SIZE_PX * BOARD_CELLS_PER_SIDE
 DEFAULT_PIECE_STATE = "idle"
@@ -99,6 +108,8 @@ def render_snapshot(snapshot: GameSnapshot) -> Img:
     board = load_board()
 
     for piece in snapshot.pieces:
+        if piece.state == PIECE_STATE_CAPTURED:
+            continue
         draw_piece(
             board,
             piece_token_to_asset_name(piece.token),
@@ -129,6 +140,67 @@ def draw_selection(board: Img, row: int, col: int) -> None:
     board.img[y + CELL_SIZE_PX - border:y + CELL_SIZE_PX, x:x + CELL_SIZE_PX] = color
     board.img[y:y + CELL_SIZE_PX, x:x + border] = color
     board.img[y:y + CELL_SIZE_PX, x + CELL_SIZE_PX - border:x + CELL_SIZE_PX] = color
+
+
+def draw_legal_destination(board: Img, row: int, col: int) -> None:
+    """Draw a transparent green overlay on a legal destination square."""
+    x, y = cell_to_pixels(row, col)
+
+    square = board.img[
+        y : y + CELL_SIZE_PX,
+        x : x + CELL_SIZE_PX,
+    ]
+
+    overlay_color = LEGAL_DESTINATION_OVERLAY_COLOR
+    alpha = LEGAL_DESTINATION_ALPHA
+
+    square[:, :, 0] = (
+        square[:, :, 0] * (1 - alpha) + overlay_color[0] * alpha
+    ).astype(square.dtype)
+    square[:, :, 1] = (
+        square[:, :, 1] * (1 - alpha) + overlay_color[1] * alpha
+    ).astype(square.dtype)
+    square[:, :, 2] = (
+        square[:, :, 2] * (1 - alpha) + overlay_color[2] * alpha
+    ).astype(square.dtype)
+
+
+def draw_rest_timer(
+    board: Img,
+    row: int,
+    col: int,
+    remaining_ms: int,
+    total_ms: int,
+) -> None:
+    """Draw a transparent countdown overlay on a resting piece's square."""
+    if total_ms <= 0:
+        return
+
+    remaining_ratio = remaining_ms / total_ms
+    remaining_ratio = max(0.0, min(1.0, remaining_ratio))
+
+    x, y = cell_to_pixels(row, col)
+    overlay_height = int(CELL_SIZE_PX * remaining_ratio)
+    overlay_y = y + CELL_SIZE_PX - overlay_height
+
+    overlay_area = board.img[
+        overlay_y : y + CELL_SIZE_PX,
+        x : x + CELL_SIZE_PX,
+    ]
+
+    overlay_color = REST_COUNTDOWN_OVERLAY_COLOR
+    alpha = REST_COUNTDOWN_OVERLAY_ALPHA
+
+    overlay_area[:, :, 0] = (
+        overlay_area[:, :, 0] * (1 - alpha) + overlay_color[0] * alpha
+    ).astype(overlay_area.dtype)
+    overlay_area[:, :, 1] = (
+        overlay_area[:, :, 1] * (1 - alpha) + overlay_color[1] * alpha
+    ).astype(overlay_area.dtype)
+    overlay_area[:, :, 2] = (
+        overlay_area[:, :, 2] * (1 - alpha) + overlay_color[2] * alpha
+    ).astype(overlay_area.dtype)
+
 
 def draw_status_text(board: Img, text: str) -> None:
     """Draw a short status message near the top-left corner of the board."""

@@ -193,12 +193,19 @@ class GameEngine:
             for col in range(self._board.num_cols):
                 piece = self._board.get_cell(row, col)
                 if piece is not None:
+                    rest_remaining_ms = None
                     if (row, col) in moving_origins:
                         state = PIECE_STATE_MOVING
-                    elif self._arbiter.is_piece_resting(piece.piece_id):
-                        state = PIECE_STATE_RESTING
                     else:
-                        state = piece.state
+                        rest_remaining_ms = self._arbiter.rest_remaining_ms(piece.piece_id)
+                        if rest_remaining_ms is not None:
+                            state = PIECE_STATE_RESTING
+                        else:
+                            state = piece.state
+                    if (row, col) in moving_origins:
+                        rest_remaining_ms = None
+                    elif rest_remaining_ms is not None:
+                        state = PIECE_STATE_RESTING
                     pieces.append(
                         PieceSnapshot(
                             row=row,
@@ -206,6 +213,7 @@ class GameEngine:
                             token=piece.token,
                             piece_id=piece.piece_id,
                             state=state,
+                            rest_remaining_ms=rest_remaining_ms,
                         )
                     )
         for piece, row, col in self._state.captured_pieces:
@@ -224,6 +232,7 @@ class GameEngine:
             game_over=self._state.is_game_over,
             selected=self._state.selected,
             pieces=tuple(pieces),
+            legal_destinations=self._legal_destinations_for_selected(),
         )
 
     def clear_source_cell(self, from_row, from_col):
@@ -291,6 +300,26 @@ class GameEngine:
         rest_ms = self._rest_durations.get(piece.piece_type, 0)
         if rest_ms > 0:
             self._arbiter.start_rest(piece.piece_id, rest_ms)
+
+    def _legal_destinations_for_selected(self):
+        selected = self._state.selected
+        if selected is None:
+            return ()
+
+        row, col = selected
+        piece = self._board.get_cell(row, col)
+        if piece is None:
+            return ()
+        if (row, col) in self.moving_origins():
+            return ()
+        if self.is_piece_resting_at(row, col):
+            return ()
+
+        destinations = self._rule_engine.piece_rules.legal_destinations(
+            self._board, piece, row, col
+        )
+        ordered = sorted((position.row, position.col) for position in destinations)
+        return tuple(ordered)
 
     def _resolve_promotion(self, moving, to_row):
         chosen_type = self._state.promotion_choice

@@ -1,7 +1,10 @@
 from kongfu_chess.engine.types import GameSnapshot
+from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 from .move_log import MoveLog
 from .board_view import (
     cell_to_pixels,
+    draw_legal_destination,
+    draw_rest_timer,
     draw_selection,
     load_board,
     piece_token_to_asset_name,
@@ -16,6 +19,8 @@ from .screen_layout import (
 )
 
 
+DEFAULT_REST_TOTAL_MS = 2000
+
 
 class GameView:
     """Render the current game snapshot with animated pieces."""
@@ -27,6 +32,7 @@ class GameView:
         "jump": "jump",
         "captured": "idle",
         "selected": "idle",
+        "resting": "long_rest",
         "short_rest": "short_rest",
         "long_rest": "long_rest",
     }
@@ -43,6 +49,8 @@ class GameView:
         board = load_board()
 
         for piece in snapshot.pieces:
+            if piece.state == PIECE_STATE_CAPTURED:
+                continue
             animator = self._get_or_create_animator(
                 piece.piece_id,
                 piece.token,
@@ -53,6 +61,17 @@ class GameView:
 
             x, y = self._pixel_position_for_piece(piece, active_move)
             current_frame.draw_on(board, x, y)
+            if piece.rest_remaining_ms is not None:
+                draw_rest_timer(
+                    board,
+                    piece.row,
+                    piece.col,
+                    piece.rest_remaining_ms,
+                    DEFAULT_REST_TOTAL_MS,
+                )
+
+        for row, col in snapshot.legal_destinations:
+            draw_legal_destination(board, row, col)
 
         if snapshot.selected is not None:
             selected_row, selected_col = snapshot.selected

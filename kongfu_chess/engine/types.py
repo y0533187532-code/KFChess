@@ -26,6 +26,7 @@ class PieceSnapshot:
     token: str
     piece_id: int
     state: str = "idle"
+    rest_remaining_ms: int | None = None
 
 
 @dataclass(frozen=True)
@@ -37,3 +38,4 @@ class GameSnapshot:
     game_over: bool
     selected: tuple | None = None
     pieces: tuple[PieceSnapshot, ...] = field(default_factory=tuple)
+    legal_destinations: tuple[tuple[int, int], ...] = field(default_factory=tuple)

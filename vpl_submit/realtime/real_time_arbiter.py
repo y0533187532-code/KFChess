@@ -26,6 +26,7 @@ class RealTimeArbiter:
     def __init__(self, executor):
         self._executor = executor
         self._active_moves = []
+        self._active_rests = {}
         self._next_order = 0
 
     @property
@@ -35,8 +36,28 @@ class RealTimeArbiter:
     def has_active_motion(self):
         return bool(self._active_moves)
 
+    @property
+    def active_rests(self):
+        return self._active_rests
+
     def moving_origins(self):
         return {move["from"] for move in self._active_moves}
+
+    def is_piece_resting(self, piece_id):
+        return piece_id in self._active_rests
+
+    def rest_remaining_ms(self, piece_id):
+        return self._active_rests.get(piece_id)
+
+    def start_rest(self, piece_id, remaining_ms):
+        if piece_id is None or remaining_ms <= 0:
+            return
+        self._active_rests[piece_id] = remaining_ms
+
+    def clear_rest(self, piece_id):
+        if piece_id is None:
+            return
+        self._active_rests.pop(piece_id, None)
 
     def schedule_travel(self, from_pos, to_pos, remaining_ms, route, color):
         cell_ms = remaining_ms // max(1, len(route))
@@ -60,6 +81,9 @@ class RealTimeArbiter:
         """Tick all motions and resolve timed cell entries plus jump landings."""
         if milliseconds < 0:
             milliseconds = 0
+
+        if milliseconds:
+            self._advance_rests(milliseconds)
 
         events = []
         seen_motion_ids = set()
@@ -114,3 +138,14 @@ class RealTimeArbiter:
         clear_motion_transit(move)
         while move in self._active_moves:
             self._active_moves.remove(move)
+
+    def _advance_rests(self, milliseconds):
+        expired_piece_ids = []
+        for piece_id, remaining in self._active_rests.items():
+            remaining_after = remaining - milliseconds
+            if remaining_after <= 0:
+                expired_piece_ids.append(piece_id)
+            else:
+                self._active_rests[piece_id] = remaining_after
+        for piece_id in expired_piece_ids:
+            self._active_rests.pop(piece_id, None)

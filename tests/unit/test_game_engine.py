@@ -62,6 +62,7 @@ def test_snapshot_exposes_read_only_game_state():
     assert snapshot.board_height == 1
     assert snapshot.game_over is False
     assert snapshot.selected == (0, 0)
+    assert snapshot.legal_destinations == ((0, 1),)
     assert snapshot.pieces == (
         PieceSnapshot(
             row=0,
@@ -69,6 +70,7 @@ def test_snapshot_exposes_read_only_game_state():
             token="wK",
             piece_id=board.get_cell(0, 0).piece_id,
             state=PIECE_STATE_IDLE,
+            rest_remaining_ms=None,
         ),
     )
 
@@ -112,6 +114,7 @@ def test_snapshot_derives_moving_state_from_active_motions_without_mutating_boar
     snapshot = engine.snapshot()
     moving = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert moving.state == PIECE_STATE_MOVING
+    assert moving.rest_remaining_ms is None
     assert moving.row == 0 and moving.col == 0
 
 
@@ -124,6 +127,7 @@ def test_snapshot_returns_mover_to_idle_after_arrival():
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert arrived.state == PIECE_STATE_RESTING
+    assert arrived.rest_remaining_ms == 2000
     assert arrived.row == 0 and arrived.col == 1
     assert board.get_cell(0, 1).state == PIECE_STATE_IDLE
 
@@ -150,8 +154,11 @@ def test_snapshot_marks_captured_victim_after_arrival():
     assert len(state.captured_pieces) == 1
     captured = next(p for p in after.pieces if p.piece_id == victim_id)
     assert captured.state == PIECE_STATE_CAPTURED
+    assert captured.rest_remaining_ms is None
     assert captured.row == 0 and captured.col == 1
-    assert next(p for p in after.pieces if p.piece_id == attacker_id).state == PIECE_STATE_RESTING
+    attacker = next(p for p in after.pieces if p.piece_id == attacker_id)
+    assert attacker.state == PIECE_STATE_RESTING
+    assert attacker.rest_remaining_ms == 2000
 
 
 def test_request_move_rejects_second_move_while_piece_is_travelling():
@@ -228,6 +235,80 @@ def test_snapshot_returns_idle_after_rest_expires():
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert arrived.state == PIECE_STATE_IDLE
+    assert arrived.rest_remaining_ms is None
+
+
+def test_snapshot_returns_partial_rest_remaining_ms():
+    board, _, engine = make_engine([["wK", "."]])
+    piece_id = board.get_cell(0, 0).piece_id
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    engine.wait(500)
+    snapshot = engine.snapshot()
+    arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
+    assert arrived.state == PIECE_STATE_RESTING
+    assert arrived.rest_remaining_ms == 1500
+
+
+def test_snapshot_has_no_legal_destinations_when_nothing_selected():
+    _, _, engine = make_engine([["wK", "."]])
+    assert engine.snapshot().legal_destinations == ()
+
+
+def test_snapshot_legal_destinations_for_rook_on_open_board():
+    board, state, engine = make_engine(
+        [
+            [".", ".", "."],
+            [".", "wR", "."],
+            [".", ".", "."],
+        ]
+    )
+    state.select(1, 1)
+    assert engine.snapshot().legal_destinations == (
+        (0, 1),
+        (1, 0),
+        (1, 2),
+        (2, 1),
+    )
+
+
+def test_snapshot_legal_destinations_excludes_friendly_destination():
+    _, state, engine = make_engine(
+        [
+            [".", "wP", "."],
+            [".", "wR", "."],
+            [".", ".", "."],
+        ]
+    )
+    state.select(1, 1)
+    assert (0, 1) not in engine.snapshot().legal_destinations
+
+
+def test_snapshot_legal_destinations_includes_enemy_destination():
+    _, state, engine = make_engine(
+        [
+            [".", "bP", "."],
+            [".", "wR", "."],
+            [".", ".", "."],
+        ]
+    )
+    state.select(1, 1)
+    assert (0, 1) in engine.snapshot().legal_destinations
+
+
+def test_snapshot_legal_destinations_empty_while_selected_piece_is_moving():
+    board, state, engine = make_engine([["wK", "."]])
+    engine.request_move(0, 0, 0, 1)
+    state.select(0, 0)
+    assert engine.snapshot().legal_destinations == ()
+
+
+def test_snapshot_legal_destinations_empty_while_selected_piece_is_resting():
+    board, state, engine = make_engine([["wK", "."]])
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    state.select(0, 1)
+    assert engine.snapshot().legal_destinations == ()
 
 
 def test_capture_clears_resting_state_for_captured_piece():
