@@ -4,7 +4,12 @@ from kongfu_chess.engine.game_engine import GameEngine
 from kongfu_chess.engine.types import MoveResult, PieceSnapshot
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.game_state import GameState
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED, PIECE_STATE_IDLE, PIECE_STATE_MOVING
+from kongfu_chess.model.piece import (
+    PIECE_STATE_CAPTURED,
+    PIECE_STATE_IDLE,
+    PIECE_STATE_MOVING,
+    PIECE_STATE_RESTING,
+)
 from kongfu_chess.rules import RuleEngine
 
 
@@ -118,7 +123,7 @@ def test_snapshot_returns_mover_to_idle_after_arrival():
 
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
-    assert arrived.state == PIECE_STATE_IDLE
+    assert arrived.state == PIECE_STATE_RESTING
     assert arrived.row == 0 and arrived.col == 1
     assert board.get_cell(0, 1).state == PIECE_STATE_IDLE
 
@@ -146,7 +151,7 @@ def test_snapshot_marks_captured_victim_after_arrival():
     captured = next(p for p in after.pieces if p.piece_id == victim_id)
     assert captured.state == PIECE_STATE_CAPTURED
     assert captured.row == 0 and captured.col == 1
-    assert next(p for p in after.pieces if p.piece_id == attacker_id).state == PIECE_STATE_IDLE
+    assert next(p for p in after.pieces if p.piece_id == attacker_id).state == PIECE_STATE_RESTING
 
 
 def test_request_move_rejects_second_move_while_piece_is_travelling():
@@ -189,5 +194,57 @@ def test_piece_may_move_again_after_motion_completes():
     engine.wait(1000)
     assert engine.active_moves == []
     result = engine.request_move(0, 1, 0, 2)
+    assert result == MoveResult(is_accepted=False, reason="piece_resting")
+    engine.wait(2000)
+    result = engine.request_move(0, 1, 0, 2)
     assert result == MoveResult(is_accepted=True, reason="ok")
     assert len(engine.active_moves) == 1
+
+
+def test_request_move_rejects_resting_piece():
+    _, _, engine = make_engine([["wK", "."]])
+    assert engine.request_move(0, 0, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    engine.wait(1000)
+    assert engine.request_move(0, 1, 0, 0) == MoveResult(
+        is_accepted=False, reason="piece_resting"
+    )
+
+
+def test_request_jump_rejects_resting_piece():
+    _, _, engine = make_engine([["wK", "."]])
+    assert engine.request_move(0, 0, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    engine.wait(1000)
+    assert engine.request_jump(0, 1) == MoveResult(
+        is_accepted=False, reason="piece_resting"
+    )
+
+
+def test_snapshot_returns_idle_after_rest_expires():
+    board, _, engine = make_engine([["wK", "."]])
+    piece_id = board.get_cell(0, 0).piece_id
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    engine.wait(2000)
+    snapshot = engine.snapshot()
+    arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
+    assert arrived.state == PIECE_STATE_IDLE
+
+
+def test_capture_clears_resting_state_for_captured_piece():
+    board = Board([["wR", ".", "bR"]])
+    state = GameState(board=board)
+    engine = GameEngine(
+        board,
+        state,
+        RuleEngine(),
+        move_durations={"R": 1000},
+        rest_durations={"R": 2000},
+    )
+    assert engine.request_move(0, 0, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    engine.wait(1000)
+    victim_id = board.get_cell(0, 1).piece_id
+    assert engine.arbiter.is_piece_resting(victim_id) is True
+    assert engine.request_move(0, 2, 0, 1) == MoveResult(is_accepted=True, reason="ok")
+    engine.wait(1000)
+    assert board.get_cell(0, 1).token == "bR"
+    assert engine.arbiter.is_piece_resting(victim_id) is False

@@ -119,5 +119,26 @@ def show_board() -> None:
     build_demo_board().show()
 
 
+def draw_selection(board: Img, row: int, col: int) -> None:
+    """Draw a visible selection frame on one board cell."""
+    x, y = cell_to_pixels(row, col)
+    border = 4
+    color = (0, 255, 255, 255)
+
+    board.img[y:y + border, x:x + CELL_SIZE_PX] = color
+    board.img[y + CELL_SIZE_PX - border:y + CELL_SIZE_PX, x:x + CELL_SIZE_PX] = color
+    board.img[y:y + CELL_SIZE_PX, x:x + border] = color
+    board.img[y:y + CELL_SIZE_PX, x + CELL_SIZE_PX - border:x + CELL_SIZE_PX] = color
+
+def draw_status_text(board: Img, text: str) -> None:
+    """Draw a short status message near the top-left corner of the board."""
+    board.put_text(
+        text,
+        x=10,
+        y=25,
+        font_size=0.7,
+        color=(255, 255, 255, 255),
+        thickness=2,
+    )
 if __name__ == "__main__":
     show_board()

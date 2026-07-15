@@ -103,6 +103,17 @@ class Img:
 
         cv2.imshow(window_name, self.img)
         return cv2.waitKey(delay_ms) & 0xFF
+    def blank(
+        self,
+        width: int,
+        height: int,
+        color=(0, 0, 0, 255),
+    ) -> "Img":
+        """Create a solid-color image of the requested size."""
+        channels = len(color)
+        self.img = np.zeros((height, width, channels), dtype=np.uint8)
+        self.img[:] = color
+        return self
     @staticmethod
     def close() -> None:
         """Close all windows created by Img."""

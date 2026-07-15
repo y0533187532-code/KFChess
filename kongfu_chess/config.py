@@ -85,6 +85,18 @@ DEFAULT_MOVE_DURATION_MS = {
     "P": 1000,
 }
 
+# --- Post-move rest durations (milliseconds per piece type) ---
+# After a piece finishes an accepted travel move, it must rest before it can
+# be selected or moved again. Injectable via Game/GameEngine for custom games.
+DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE = {
+    "K": 2000,
+    "Q": 2000,
+    "R": 2000,
+    "B": 2000,
+    "N": 2000,
+    "P": 2000,
+}
+
 class ErrorCode:
     """String codes reported to the caller on parsing failures."""
     EMPTY_BOARD = "EMPTY_BOARD"

@@ -1,7 +1,9 @@
 from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
+from kongfu_chess.graphics.board_view import cell_to_pixels
 from kongfu_chess.graphics.game_view import GameView
 from kongfu_chess.graphics.img import Img
 from kongfu_chess.graphics.piece_animator import PieceAnimator
+from kongfu_chess.graphics.screen_layout import BOARD_X_PX, BOARD_Y_PX
 
 
 def test_render_returns_img_board():
@@ -122,3 +124,58 @@ def test_unknown_state_falls_back_to_idle_assets():
     view.render(snapshot)
 
     assert view._animators_by_piece_id[8].state_name == "idle"
+
+
+def test_pixel_position_for_piece_without_active_move_uses_cell_position():
+    view = GameView()
+    piece = PieceSnapshot(row=6, col=3, token="wP", piece_id=1)
+
+    x, y = view._pixel_position_for_piece(piece, None)
+
+    assert (x, y) == cell_to_pixels(6, 3)
+
+
+def test_pixel_position_for_piece_with_active_move_returns_intermediate_position():
+    view = GameView()
+    piece = PieceSnapshot(row=6, col=3, token="wP", piece_id=1, state="moving")
+    active_move = {
+        "from": (6, 3),
+        "to": (6, 5),
+        "total_ms": 1000,
+        "remaining": 500,
+    }
+
+    x, y = view._pixel_position_for_piece(piece, active_move)
+
+    assert (x, y) == (400, 600)
+
+
+def test_pixel_position_for_piece_with_non_positive_total_ms_falls_back_to_cell():
+    view = GameView()
+    piece = PieceSnapshot(row=6, col=3, token="wP", piece_id=1, state="moving")
+    active_move = {
+        "from": (6, 3),
+        "to": (6, 5),
+        "total_ms": 0,
+        "remaining": 0,
+    }
+
+    x, y = view._pixel_position_for_piece(piece, active_move)
+
+    assert (x, y) == cell_to_pixels(6, 3)
+
+
+def test_render_draws_selection_when_snapshot_has_selected_cell():
+    view = GameView()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        selected=(7, 4),
+        pieces=(PieceSnapshot(row=7, col=4, token="wK", piece_id=1),),
+    )
+
+    board = view.render(snapshot)
+    x, y = cell_to_pixels(7, 4)
+
+    assert tuple(board.img[BOARD_Y_PX + y, BOARD_X_PX + x]) == (0, 255, 255, 255)

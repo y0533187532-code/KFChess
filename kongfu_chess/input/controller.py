@@ -34,7 +34,11 @@ class Controller:
         moving_origins = self._engine.moving_origins()
 
         if self._state.selected is None:
-            if clicked_piece is not None and (row, col) not in moving_origins:
+            if (
+                clicked_piece is not None
+                and (row, col) not in moving_origins
+                and not self._engine.is_piece_resting_at(row, col)
+            ):
                 self._state.select(row, col)
             return
 
@@ -54,6 +58,8 @@ class Controller:
         selected_piece = self._board.get_cell(from_row, from_col)
         if clicked_piece is not None and clicked_piece.color == selected_piece.color:
             if (row, col) in moving_origins:
+                self._state.clear_selection()
+            elif self._engine.is_piece_resting_at(row, col):
                 self._state.clear_selection()
             else:
                 self._state.select(row, col)

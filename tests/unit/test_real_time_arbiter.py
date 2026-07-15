@@ -95,3 +95,15 @@ def test_negative_wait_does_not_extend_remaining_time():
     assert engine.active_moves[0]["remaining"] == 1000
     engine.wait(1000)
     assert board.get_cell(0, 1).token == "wK"
+
+
+def test_rest_timer_counts_down_after_arrival():
+    _, _, engine = make_engine([["wK", "."]])
+    piece_id = engine.board.get_cell(0, 0).piece_id
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    assert engine.arbiter.active_rests[piece_id] == 2000
+    engine.wait(500)
+    assert engine.arbiter.active_rests[piece_id] == 1500
+    engine.wait(1500)
+    assert piece_id not in engine.arbiter.active_rests

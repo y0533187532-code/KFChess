@@ -5,6 +5,7 @@ from kongfu_chess.graphics.board_view import (
     DEMO_INITIAL_LAYOUT,
     build_demo_board,
     cell_to_pixels,
+    draw_selection,
     draw_piece,
     load_board,
     load_piece,
@@ -88,3 +89,14 @@ def test_render_snapshot_draws_piece_from_snapshot_token():
 
     assert isinstance(board, Img)
     assert board.img is not None
+
+
+def test_draw_selection_changes_board_border_pixels():
+    board = load_board()
+    x, y = cell_to_pixels(7, 4)
+    before = board.img.copy()
+
+    draw_selection(board, 7, 4)
+
+    assert (before[y, x] != board.img[y, x]).any()
+    assert (before[y + CELL_SIZE_PX - 1, x + CELL_SIZE_PX - 1] != board.img[y + CELL_SIZE_PX - 1, x + CELL_SIZE_PX - 1]).any()

@@ -10,6 +10,7 @@ class FakeEngine:
         self.move_requests = []
         self.jump_requests = []
         self.moving = set()
+        self.resting = set()
 
     def moving_origins(self):
         return self.moving
@@ -21,6 +22,9 @@ class FakeEngine:
     def request_jump(self, from_row, from_col):
         self.jump_requests.append((from_row, from_col))
         return MoveResult(is_accepted=True, reason="ok")
+
+    def is_piece_resting_at(self, row, col):
+        return (row, col) in self.resting
 
 
 def make_controller(rows):
@@ -106,3 +110,21 @@ def test_invalid_second_click_still_clears_selection():
     controller.click(250, 50)
     assert rejecting.move_requests == [(0, 0, 0, 2)]
     assert state.selected is None
+
+
+def test_first_click_on_resting_piece_does_not_select_it():
+    _, state, engine, controller = make_controller([["wK", "."]])
+    engine.resting.add((0, 0))
+    controller.click(50, 50)
+    assert state.selected is None
+    assert engine.move_requests == []
+    assert engine.jump_requests == []
+
+
+def test_friendly_reselect_on_resting_piece_clears_selection():
+    _, state, engine, controller = make_controller([["wK", "wQ"]])
+    controller.click(50, 50)
+    engine.resting.add((0, 1))
+    controller.click(150, 50)
+    assert state.selected is None
+    assert engine.move_requests == []

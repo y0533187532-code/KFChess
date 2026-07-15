@@ -85,3 +85,11 @@ def test_put_text_changes_loaded_image():
     image.put_text("A", 5, 20, 0.5)
 
     assert np.count_nonzero(image.img) > 0
+
+
+def test_blank_creates_solid_color_image():
+    image = Img().blank(width=5, height=3, color=(1, 2, 3, 4))
+
+    assert image.img.shape == (3, 5, 4)
+    assert np.array_equal(image.img[0, 0], np.array([1, 2, 3, 4], dtype=np.uint8))
+    assert np.array_equal(image.img[-1, -1], np.array([1, 2, 3, 4], dtype=np.uint8))

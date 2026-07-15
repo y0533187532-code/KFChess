@@ -6,6 +6,7 @@ from kongfu_chess.model.board import Board
 
 from .game_view import GameView
 from .img import Img
+from .screen_layout import screen_to_board_pixels
 
 
 SAMPLE_BOARD_SIZE = 8
@@ -108,13 +109,15 @@ def show_real_game_window() -> None:
         while True:
             pending_click = click_buffer.pop_click()
             if pending_click is not None:
-                pixel_x, pixel_y = pending_click
-                game.handle_click(pixel_x, pixel_y)
+                board_click = screen_to_board_pixels(*pending_click)
+                if board_click is not None:
+                    pixel_x, pixel_y = board_click
+                    game.handle_click(pixel_x, pixel_y)
 
             game.handle_wait(16)
-
             snapshot = game.snapshot()
-            board = view.render(snapshot)
+            board = view.render(snapshot, game.engine.active_moves)
+            
             pressed_key = board.show_frame(
                 window_name=GAME_WINDOW_NAME,
                 delay_ms=16,
