@@ -8,6 +8,7 @@ def test_game_state_starts_not_over_with_no_selection():
     state = GameState(board=board)
     assert state.is_game_over is False
     assert state.selected is None
+    assert state.score_by_color == {"w": 0, "b": 0}
 
 
 def test_game_state_mark_game_over():
@@ -34,3 +35,12 @@ def test_game_uses_game_state():
     assert game.state.board is board
     assert game.state.is_game_over is False
     assert game._controller.selected is None
+
+
+def test_game_state_add_score_accumulates_points():
+    board = Board([["wK"]])
+    state = GameState(board=board)
+    state.add_score("w", 3)
+    state.add_score("w", 5)
+    state.add_score("b", 1)
+    assert state.score_by_color == {"w": 8, "b": 1}

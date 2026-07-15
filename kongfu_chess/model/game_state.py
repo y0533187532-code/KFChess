@@ -17,6 +17,7 @@ class GameState:
     selected: tuple | None = field(default=None)
     promotion_choice: str | None = field(default=None)
     captured_pieces: list = field(default_factory=list)
+    score_by_color: dict[str, int] = field(default_factory=lambda: {"w": 0, "b": 0})
 
     @property
     def is_game_over(self):
@@ -42,3 +43,6 @@ class GameState:
     def record_capture(self, piece, row, col):
         """Remember a captured piece for snapshot rendering."""
         self.captured_pieces.append((piece, row, col))
+
+    def add_score(self, color, points):
+        self.score_by_color[color] = self.score_by_color.get(color, 0) + points

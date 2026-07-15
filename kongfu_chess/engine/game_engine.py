@@ -16,6 +16,7 @@ try:
         DEFAULT_MOVE_DURATION_MS,
         DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE,
         KING_PIECE_TYPE,
+        PIECE_SCORE_VALUES,
     )
     from ..engine.types import GameSnapshot, MoveResult, PieceSnapshot
     from ..model.piece import (
@@ -36,6 +37,7 @@ except ImportError:
         DEFAULT_MOVE_DURATION_MS,
         DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE,
         KING_PIECE_TYPE,
+        PIECE_SCORE_VALUES,
     )
     from engine.types import GameSnapshot, MoveResult, PieceSnapshot
     from model.piece import PIECE_STATE_CAPTURED, PIECE_STATE_MOVING, PIECE_STATE_RESTING
@@ -233,6 +235,7 @@ class GameEngine:
             selected=self._state.selected,
             pieces=tuple(pieces),
             legal_destinations=self._legal_destinations_for_selected(),
+            score_by_color=dict(self._state.score_by_color),
         )
 
     def clear_source_cell(self, from_row, from_col):
@@ -263,6 +266,9 @@ class GameEngine:
         self._start_rest_for_piece_at(to_row, to_col)
         if result.captured_piece is not None:
             self._state.record_capture(result.captured_piece, to_row, to_col)
+            if result.captured_piece.color != move["color"]:
+                points = PIECE_SCORE_VALUES.get(result.captured_piece.piece_type, 0)
+                self._state.add_score(move["color"], points)
             self._arbiter.clear_rest(result.captured_piece.piece_id)
             self._cancel_motions_from(to_row, to_col)
         if result.king_captured:

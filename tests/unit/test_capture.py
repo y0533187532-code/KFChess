@@ -40,6 +40,7 @@ def test_non_king_capture_on_arrival_does_not_end_game():
     engine.wait(1000)
     assert board.get_cell(0, 1).token == "wR"
     assert state.is_game_over is False
+    assert state.score_by_color == {"w": 9, "b": 0}
 
 
 def test_king_capture_on_arrival_sets_game_over():
@@ -49,6 +50,7 @@ def test_king_capture_on_arrival_sets_game_over():
     engine.wait(1000)
     assert board.get_cell(0, 1).token == "wR"
     assert state.is_game_over is True
+    assert state.score_by_color == {"w": 0, "b": 0}
 
 
 def test_capture_not_applied_before_arrival():
@@ -73,3 +75,25 @@ def test_rule_engine_unaware_of_game_over():
     state.mark_game_over()
     validation = engine.rule_engine.validate_move(board, 0, 0, 0, 1)
     assert validation.is_valid is True
+
+
+def test_white_capture_of_black_pawn_adds_one_point():
+    board, state, engine = make_engine([["wR", "bP"]])
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    assert state.score_by_color == {"w": 1, "b": 0}
+
+
+def test_black_capture_of_white_queen_adds_nine_points():
+    board, state, engine = make_engine([["bR", "wQ"]])
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    assert state.score_by_color == {"w": 0, "b": 9}
+
+
+def test_snapshot_exposes_score_by_color():
+    board, state, engine = make_engine([["wR", "bP"]])
+    assert engine.snapshot().score_by_color == {"w": 0, "b": 0}
+    engine.request_move(0, 0, 0, 1)
+    engine.wait(1000)
+    assert engine.snapshot().score_by_color == {"w": 1, "b": 0}

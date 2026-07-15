@@ -39,3 +39,4 @@ class GameSnapshot:
     selected: tuple | None = None
     pieces: tuple[PieceSnapshot, ...] = field(default_factory=tuple)
     legal_destinations: tuple[tuple[int, int], ...] = field(default_factory=tuple)
+    score_by_color: dict[str, int] = field(default_factory=dict)

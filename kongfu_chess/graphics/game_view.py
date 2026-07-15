@@ -11,6 +11,7 @@ from .board_view import (
 )
 from .img import Img
 from .piece_animator import PieceAnimator
+from .player_panel import PlayerPanel
 from .screen_layout import (
     build_screen_canvas,
     draw_board_on_screen,
@@ -41,6 +42,7 @@ class GameView:
         self._animators_by_piece_id: dict[int, PieceAnimator] = {}
         self._move_log = MoveLog()
         self._frame_index = 0
+        self._player_panel = PlayerPanel()
 
     def render(self, snapshot: GameSnapshot, active_moves: list[dict] | None = None) -> Img:
         """Draw the full board from a read-only snapshot."""
@@ -79,25 +81,17 @@ class GameView:
 
         screen = build_screen_canvas()
         draw_board_on_screen(screen, board)
-        status_text = self._status_text(snapshot, active_moves)
+        status_text = self._player_panel.status_text(snapshot, active_moves)
         draw_status_text(screen, status_text)
-        left_text, right_text = self._move_log.lines_by_color()
+        white_moves, black_moves = self._move_log.lines_by_color()
+        left_text, right_text = self._player_panel.side_panel_lines(
+            snapshot,
+            white_moves,
+            black_moves,
+        )
         draw_side_panel_text(screen, left_text, right_text)
         self._frame_index += 1
         return screen
-
-    def _status_text(self, snapshot: GameSnapshot, active_moves: list[dict]) -> str:
-        """Build a short UI status line for the current snapshot."""
-        if snapshot.game_over:
-            return "Game Over"
-        if snapshot.selected is not None:
-            row, col = snapshot.selected
-            return f"Selected: ({row}, {col})"
-
-        if active_moves:
-            return f"Active moves: {len(active_moves)}"
-
-        return "Ready"
 
     def _asset_state_for(self, state: str) -> str:
         """Map logical piece states to the available asset state folders."""
@@ -167,7 +161,3 @@ class GameView:
         y = int(start_y + (end_y - start_y) * progress)
 
         return x, y
-
-
-
-    
