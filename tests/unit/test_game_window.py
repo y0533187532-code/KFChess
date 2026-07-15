@@ -82,7 +82,27 @@ def test_build_sample_game_snapshot_contains_expected_pieces():
 
     assert snapshot.board_width == SAMPLE_BOARD_SIZE
     assert snapshot.board_height == SAMPLE_BOARD_SIZE
-    assert sorted(piece.token for piece in snapshot.pieces) == ["bK", "wK", "wP"]
+    assert len(snapshot.pieces) == 32
+    assert [piece.token for piece in snapshot.pieces[:8]] == [
+        "bR",
+        "bN",
+        "bB",
+        "bQ",
+        "bK",
+        "bB",
+        "bN",
+        "bR",
+    ]
+    assert [piece.token for piece in snapshot.pieces[-8:]] == [
+        "wR",
+        "wN",
+        "wB",
+        "wQ",
+        "wK",
+        "wB",
+        "wN",
+        "wR",
+    ]
 
 
 def test_mouse_click_buffer_returns_click_once():
