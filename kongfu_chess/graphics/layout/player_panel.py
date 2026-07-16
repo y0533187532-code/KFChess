@@ -34,6 +34,16 @@ class PlayerPanel:
         black_score = snapshot.score_by_color.get("b", 0)
 
         return (
-            [self.white_player_name, f"Score: {white_score}", *white_moves[1:]],
-            [self.black_player_name, f"Score: {black_score}", *black_moves[1:]],
-        )
+    [
+        self.white_player_name,
+        f"Score: {white_score}",
+        "Moves:",
+        *white_moves[1:],
+    ],
+    [
+        self.black_player_name,
+        f"Score: {black_score}",
+        "Moves:",
+        *black_moves[1:],
+    ],
+)

@@ -24,9 +24,10 @@ def test_side_panel_lines_include_player_names_and_scores():
     assert left_lines == [
         WHITE_PLAYER_NAME,
         "Score: 5",
+        "Moves:",
         "0.0s Pawn: d2->d4",
     ]
-    assert right_lines == [BLACK_PLAYER_NAME, "Score: 9"]
+    assert right_lines == [BLACK_PLAYER_NAME, "Score: 9", "Moves:"]
 
 
 def test_status_text_includes_player_names():

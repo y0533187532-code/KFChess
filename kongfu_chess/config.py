@@ -60,7 +60,7 @@ DEFAULT_PROMOTION_BY_PIECE_TYPE = {PAWN_PIECE_TYPE: DEFAULT_PROMOTION_PIECE_TYPE
 # never buried as a magic number inside click-handling logic.
 CELL_SIZE_PX = 100
 
-# --- Text commands understood by the CommandRunner ---
+# --- Text commands understood by the ScriptRunner---
 # Kept out of business logic (SRP / no hardcoded strings) so the protocol
 # vocabulary lives in one place, same spirit as the section headers above.
 CLICK_COMMAND = "click"

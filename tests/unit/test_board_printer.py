@@ -1,4 +1,5 @@
 import io
+import pytest
 
 from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
 from kongfu_chess.game import Game
@@ -10,6 +11,13 @@ from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 def test_render_rows_matches_board_render_rows():
     board = Board([["wK", "."]])
     assert BoardPrinter().render_rows(board) == ["wK ."]
+
+
+def test_render_rows_accepts_game_state():
+    board = Board([["wK", "."]])
+    game = Game(board)
+
+    assert BoardPrinter().render_rows(game.state) == ["wK ."]
 
 
 def test_render_rows_accepts_game_snapshot():
@@ -36,3 +44,8 @@ def test_render_rows_from_snapshot_omits_captured_pieces():
         ),
     )
     assert BoardPrinter().render_rows(snapshot) == ["wR ."]
+
+
+def test_render_rows_rejects_unsupported_source():
+    with pytest.raises(TypeError):
+        BoardPrinter().render_rows(object())

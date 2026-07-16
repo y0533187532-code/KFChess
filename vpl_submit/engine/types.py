@@ -30,6 +30,16 @@ class PieceSnapshot:
 
 
 @dataclass(frozen=True)
+class MoveEventSnapshot:
+    piece_id: int
+    token: str
+    from_pos: tuple[int, int]
+    requested_to: tuple[int, int]
+    actual_to: tuple[int, int]
+    reason: str
+
+
+@dataclass(frozen=True)
 class GameSnapshot:
     """Read-only view model / DTO for the renderer and diagnostics."""
 
@@ -40,3 +50,4 @@ class GameSnapshot:
     pieces: tuple[PieceSnapshot, ...] = field(default_factory=tuple)
     legal_destinations: tuple[tuple[int, int], ...] = field(default_factory=tuple)
     score_by_color: dict[str, int] = field(default_factory=dict)
+    completed_moves: tuple[MoveEventSnapshot, ...] = field(default_factory=tuple)

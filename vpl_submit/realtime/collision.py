@@ -31,6 +31,13 @@ def get_cell_occupant(board, cell, active_moves):
     row, col = cell
     piece = board.get_cell(row, col)
     if piece is not None:
+        for motion in active_moves:
+            if (
+                is_jump_motion(motion)
+                and motion["from"] == cell
+                and motion["color"] == piece.color
+            ):
+                return ("airborne", motion["color"], motion)
         return ("board", piece.color, piece)
     for motion in active_moves:
         if is_jump_motion(motion):
@@ -73,5 +80,8 @@ def resolve_travel_cell_entry(executor, motion, route_index, cell, active_moves)
     to_row, to_col = cell
     if occ_kind == "transit":
         executor.cancel_motion(occ_value, captured_at=cell)
+    if occ_kind == "airborne":
+        executor.execute_move_to_airborne_origin(motion, to_row, to_col)
+        return True
     executor.execute_move_to_cell(motion, to_row, to_col)
     return True

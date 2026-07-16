@@ -1,4 +1,4 @@
-from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
+from kongfu_chess.engine.types import GameSnapshot, MoveEventSnapshot, PieceSnapshot
 from kongfu_chess.graphics.move_log import MoveLog
 
 
@@ -84,6 +84,56 @@ def test_record_new_moves_adds_black_move_to_right_panel():
     left_lines, right_lines = move_log.lines_by_color()
     assert left_lines == ["White"]
     assert right_lines == ["Black", "0.0s King: e8->e7"]
+
+
+def test_record_new_moves_uses_completed_move_actual_destination():
+    move_log = MoveLog()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        completed_moves=(
+            MoveEventSnapshot(
+                piece_id=2,
+                token="wQ",
+                from_pos=(0, 3),
+                requested_to=(0, 1),
+                actual_to=(0, 2),
+                reason="same_color_blocked",
+            ),
+        ),
+    )
+
+    move_log.record_new_moves(snapshot, active_moves=[], frame_index=0)
+
+    left_lines, right_lines = move_log.lines_by_color()
+    assert left_lines == ["White", "0.0s Queen: d8->c8 (blocked)"]
+    assert right_lines == ["Black"]
+
+
+def test_record_new_moves_marks_completed_capture():
+    move_log = MoveLog()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        completed_moves=(
+            MoveEventSnapshot(
+                piece_id=2,
+                token="bB",
+                from_pos=(1, 1),
+                requested_to=(0, 0),
+                actual_to=(0, 0),
+                reason="capture",
+            ),
+        ),
+    )
+
+    move_log.record_new_moves(snapshot, active_moves=[], frame_index=0)
+
+    left_lines, right_lines = move_log.lines_by_color()
+    assert left_lines == ["White"]
+    assert right_lines == ["Black", "0.0s Bishop: b7->a8 (capture)"]
 
 
 def test_cell_name_converts_board_position_to_chess_name():

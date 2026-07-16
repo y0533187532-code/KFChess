@@ -73,6 +73,63 @@ def test_draw_on_raises_when_sprite_does_not_fit():
         foreground.draw_on(background, 1, 1)
 
 
+def test_draw_on_clips_when_sprite_starts_above_target():
+    background = Img()
+    background.img = np.zeros((4, 4, 4), dtype=np.uint8)
+
+    foreground = Img()
+    foreground.img = np.zeros((4, 2, 4), dtype=np.uint8)
+    foreground.img[..., 1] = 180
+    foreground.img[..., 3] = 255
+
+    foreground.draw_on(background, 1, -2)
+
+    assert np.array_equal(background.img[0:2, 1:3, 1], np.full((2, 2), 180, dtype=np.uint8))
+    assert np.count_nonzero(background.img[2:, :, 1]) == 0
+
+
+def test_draw_on_clips_when_sprite_starts_left_of_target():
+    background = Img()
+    background.img = np.zeros((4, 4, 4), dtype=np.uint8)
+
+    foreground = Img()
+    foreground.img = np.zeros((2, 4, 4), dtype=np.uint8)
+    foreground.img[..., 0] = 120
+    foreground.img[..., 3] = 255
+
+    foreground.draw_on(background, -2, 1)
+
+    assert np.array_equal(background.img[1:3, 0:2, 0], np.full((2, 2), 120, dtype=np.uint8))
+    assert np.count_nonzero(background.img[:, 2:, 0]) == 0
+
+
+def test_draw_on_returns_when_sprite_is_fully_above_target():
+    background = Img()
+    background.img = np.zeros((4, 4, 4), dtype=np.uint8)
+
+    foreground = Img()
+    foreground.img = np.ones((2, 2, 4), dtype=np.uint8) * 255
+
+    foreground.draw_on(background, 1, -5)
+
+    assert np.count_nonzero(background.img) == 0
+
+
+def test_draw_on_requires_loaded_images():
+    with pytest.raises(ValueError):
+        Img().draw_on(Img(), 0, 0)
+
+
+def test_show_requires_loaded_image():
+    with pytest.raises(ValueError):
+        Img().show()
+
+
+def test_show_frame_requires_loaded_image():
+    with pytest.raises(ValueError):
+        Img().show_frame()
+
+
 def test_put_text_requires_loaded_image():
     with pytest.raises(ValueError):
         Img().put_text("score", 0, 0, 1.0)

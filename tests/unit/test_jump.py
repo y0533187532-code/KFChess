@@ -114,6 +114,90 @@ def test_enemy_arriving_at_airborne_origin_captures_jumper():
     assert board.get_cell(0, 1) is None
 
 
+def test_enemy_diagonal_arrival_captures_airborne_jumper_and_logs_actual_resolution():
+    board, state, engine = make_engine(
+        [
+            ["wK", ".", "."],
+            [".", "bB", "."],
+            [".", ".", "."],
+        ]
+    )
+    white_piece_id = board.get_cell(0, 0).piece_id
+    black_piece_id = board.get_cell(1, 1).piece_id
+
+    assert engine.request_jump(0, 0) == MoveResult(is_accepted=True, reason="ok")
+    assert engine.request_move(1, 1, 0, 0) == MoveResult(is_accepted=True, reason="ok")
+
+    finish_jump(engine)
+
+    assert board.get_cell(0, 0).token == "bB"
+    assert board.get_cell(0, 0).piece_id == black_piece_id
+    assert board.get_cell(1, 1) is None
+    assert any(piece.piece_id == white_piece_id for piece, _, _ in state.captured_pieces)
+    assert not any(is_jump_motion(move) and move["from"] == (0, 0) for move in engine.active_moves)
+    assert engine.snapshot().score_by_color == {"w": 0, "b": 0}
+
+    event = engine.snapshot().completed_moves[-1]
+    assert event.piece_id == black_piece_id
+    assert event.from_pos == (1, 1)
+    assert event.requested_to == (0, 0)
+    assert event.actual_to == (0, 0)
+    assert event.reason == "capture"
+
+
+def test_jumper_lands_after_enemy_arrival_and_captures_enemy():
+    board, state, engine = make_engine(
+        [
+            ["wK", "."],
+            [".", "bB"],
+        ]
+    )
+    white_piece_id = board.get_cell(0, 0).piece_id
+    black_piece_id = board.get_cell(1, 1).piece_id
+
+    assert engine.request_move(1, 1, 0, 0) == MoveResult(
+        is_accepted=True,
+        reason="ok",
+    )
+    assert engine.request_jump(0, 0) == MoveResult(is_accepted=True, reason="ok")
+
+    finish_jump(engine)
+
+    assert board.get_cell(0, 0).token == "wK"
+    assert board.get_cell(0, 0).piece_id == white_piece_id
+    assert board.get_cell(1, 1) is None
+    assert any(piece.piece_id == black_piece_id for piece, _, _ in state.captured_pieces)
+    assert engine.snapshot().score_by_color == {"w": 3, "b": 0}
+
+
+def test_snapshot_keeps_airborne_jumper_visible_above_enemy_on_same_cell():
+    board = Board(
+        [
+            ["wK", "."],
+            [".", "bB"],
+        ]
+    )
+    state = GameState(board=board)
+    engine = GameEngine(board, state, RuleEngine(), jump_duration_ms=2000)
+    white_piece_id = board.get_cell(0, 0).piece_id
+    black_piece_id = board.get_cell(1, 1).piece_id
+
+    engine.request_move(1, 1, 0, 0)
+    engine.request_jump(0, 0)
+    engine.wait(DEFAULT_JUMP_DURATION_MS)
+
+    pieces = {piece.piece_id: piece for piece in engine.snapshot().pieces}
+
+    assert pieces[white_piece_id].token == "wK"
+    assert pieces[white_piece_id].state == "jump"
+    assert pieces[white_piece_id].row == 0
+    assert pieces[white_piece_id].col == 0
+    assert pieces[black_piece_id].token == "bB"
+    assert pieces[black_piece_id].state != "jump"
+    assert pieces[black_piece_id].row == 0
+    assert pieces[black_piece_id].col == 0
+
+
 # --- Parallel movement interaction ---
 
 

@@ -39,3 +39,13 @@ def test_boundary_pixel_at_last_valid_cell():
     cell = mapper.pixel_to_cell(199, 199, board)
     assert cell.row == 1
     assert cell.col == 1
+
+
+def test_custom_cell_size_is_used():
+    board = Board([[".", "."], [".", "."]])
+    mapper = BoardMapper(cell_size_px=10)
+
+    cell = mapper.pixel_to_cell(15, 5, board)
+
+    assert cell.row == 0
+    assert cell.col == 1

@@ -66,18 +66,39 @@ class Img:
         h, w = self.img.shape[:2]
         H, W = other_img.img.shape[:2]
 
+        source_x = 0
+        source_y = 0
+        target_x = x
+        target_y = y
+        draw_w = w
+        draw_h = h
+
+        if target_x < 0:
+            source_x = -target_x
+            draw_w -= source_x
+            target_x = 0
+
+        if target_y < 0:
+            source_y = -target_y
+            draw_h -= source_y
+            target_y = 0
+
+        if draw_w <= 0 or draw_h <= 0:
+            return
+
         if y + h > H or x + w > W:
             raise ValueError("Logo does not fit at the specified position.")
 
-        roi = other_img.img[y:y + h, x:x + w]
+        source = self.img[source_y:source_y + draw_h, source_x:source_x + draw_w]
+        roi = other_img.img[target_y:target_y + draw_h, target_x:target_x + draw_w]
 
         if self.img.shape[2] == 4:
-            b, g, r, a = cv2.split(self.img)
+            b, g, r, a = cv2.split(source)
             mask = a / 255.0
             for c in range(3):
-                roi[..., c] = (1 - mask) * roi[..., c] + mask * self.img[..., c]
+                roi[..., c] = (1 - mask) * roi[..., c] + mask * source[..., c]
         else:
-            other_img.img[y:y + h, x:x + w] = self.img
+            other_img.img[target_y:target_y + draw_h, target_x:target_x + draw_w] = source
 
     def put_text(self, txt, x, y, font_size, color=(255, 255, 255, 255), thickness=1):
         if self.img is None:

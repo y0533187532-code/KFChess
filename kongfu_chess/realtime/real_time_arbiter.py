@@ -70,8 +70,8 @@ class RealTimeArbiter:
         self._next_order += 1
         return motion
 
-    def schedule_jump(self, from_pos, remaining_ms, color):
-        motion = make_jump_motion(from_pos, remaining_ms, self._next_order, color)
+    def schedule_jump(self, from_pos, remaining_ms, color, piece=None):
+        motion = make_jump_motion(from_pos, remaining_ms, self._next_order, color, piece)
         motion["total_ms"] = remaining_ms
         self._active_moves.append(motion)
         self._next_order += 1
@@ -132,6 +132,8 @@ class RealTimeArbiter:
 
     def _complete_jump(self, move):
         """End an airborne jump; logical board occupancy is unchanged."""
+        if hasattr(self._executor, "complete_jump"):
+            self._executor.complete_jump(move)
         self._remove_active_move(move)
 
     def _remove_active_move(self, move):

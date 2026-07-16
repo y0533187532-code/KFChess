@@ -1,4 +1,9 @@
+from kongfu_chess.config import CELL_SIZE_PX
+
 from ..board.board_coordinates import cell_to_pixels
+
+
+JUMP_HEIGHT_PX = CELL_SIZE_PX // 2
 
 
 class PiecePositioner:
@@ -11,6 +16,9 @@ class PiecePositioner:
     ) -> dict | None:
         """Return the active motion record for this piece, if it exists."""
         for move in active_moves:
+            moving_piece = move.get("piece")
+            if moving_piece is not None and moving_piece.piece_id != piece.piece_id:
+                continue
             move_row, move_col = move["from"]
             if (piece.row, piece.col) == (move_row, move_col):
                 return move
@@ -42,6 +50,11 @@ class PiecePositioner:
 
         x = int(start_x + (end_x - start_x) * progress)
         y = int(start_y + (end_y - start_y) * progress)
+        if active_move.get("jump"):
+            y -= self._jump_offset(progress)
 
         return x, y
-    
+
+    def _jump_offset(self, progress: float) -> int:
+        """Return how high the piece should visually rise during a jump."""
+        return int(JUMP_HEIGHT_PX * (1 - abs(0.5 - progress) * 2))

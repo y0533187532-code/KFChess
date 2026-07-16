@@ -30,8 +30,8 @@ def test_build_screen_canvas_draws_header_and_side_panels():
     screen = build_screen_canvas()
 
     assert tuple(screen.img[0, 0]) == HEADER_COLOR
-    assert tuple(screen.img[HEADER_HEIGHT_PX, 0]) == PANEL_COLOR
-    assert tuple(screen.img[HEADER_HEIGHT_PX, SCREEN_WIDTH_PX - 1]) == PANEL_COLOR
+    assert tuple(screen.img[HEADER_HEIGHT_PX, 0]) == BACKGROUND_COLOR
+    assert tuple(screen.img[HEADER_HEIGHT_PX, SCREEN_WIDTH_PX - 1]) == BACKGROUND_COLOR
     assert tuple(screen.img[SCREEN_HEIGHT_PX - 1, SIDE_PANEL_WIDTH_PX]) == BACKGROUND_COLOR
 
 

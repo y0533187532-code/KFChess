@@ -70,3 +70,35 @@ def test_pixel_position_for_piece_with_non_positive_total_ms_falls_back_to_cell(
     x, y = positioner.pixel_position_for_piece(piece, active_move)
 
     assert (x, y) == cell_to_pixels(6, 3)
+
+
+def test_pixel_position_for_jump_raises_piece_at_midpoint():
+    positioner = PiecePositioner()
+    piece = PieceSnapshot(row=6, col=3, token="wP", piece_id=1, state="jump")
+    active_move = {
+        "from": (6, 3),
+        "to": (6, 3),
+        "total_ms": 1000,
+        "remaining": 500,
+        "jump": True,
+    }
+
+    x, y = positioner.pixel_position_for_piece(piece, active_move)
+
+    assert (x, y) == (300, 550)
+
+
+def test_pixel_position_for_jump_starts_on_original_cell():
+    positioner = PiecePositioner()
+    piece = PieceSnapshot(row=6, col=3, token="wP", piece_id=1, state="jump")
+    active_move = {
+        "from": (6, 3),
+        "to": (6, 3),
+        "total_ms": 1000,
+        "remaining": 1000,
+        "jump": True,
+    }
+
+    x, y = positioner.pixel_position_for_piece(piece, active_move)
+
+    assert (x, y) == cell_to_pixels(6, 3)

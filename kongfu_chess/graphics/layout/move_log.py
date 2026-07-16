@@ -10,6 +10,13 @@ PIECE_TYPE_NAMES = {
     "N": "Knight",
     "P": "Pawn",
 }
+
+MOVE_REASON_LABELS = {
+    "capture": " (capture)",
+    "same_color_blocked": " (blocked)",
+}
+
+
 class MoveLog:
     def __init__(self) -> None:
         self._logged_move_keys: set[tuple] = set()
@@ -32,18 +39,30 @@ class MoveLog:
         piece_type = token[PIECE_TYPE_INDEX]
         return PIECE_TYPE_NAMES.get(piece_type, token)
 
-    def _format_move_log_line(self, token: str, move: dict, frame_index: int) -> str:
-        from_row, from_col = move["from"]
-        to_row, to_col = move["to"]
-
+    def _format_move_log_line(
+        self,
+        token: str,
+        from_pos: tuple[int, int],
+        to_pos: tuple[int, int],
+        frame_index: int,
+        reason: str | None = None,
+    ) -> str:
+        from_row, from_col = from_pos
+        to_row, to_col = to_pos
         seconds = frame_index / 60
         from_cell = self._cell_name(from_row, from_col)
         to_cell = self._cell_name(to_row, to_col)
         piece_name = self._piece_name(token)
+        reason_label = MOVE_REASON_LABELS.get(reason, "")
 
-        return f"{seconds:.1f}s {piece_name}: {from_cell}->{to_cell}"
+        return f"{seconds:.1f}s {piece_name}: {from_cell}->{to_cell}{reason_label}"
         
     def record_new_moves(self, snapshot, active_moves: list[dict], frame_index: int) -> None:
+        completed_moves = getattr(snapshot, "completed_moves", ())
+        if completed_moves:
+            self._record_completed_moves(completed_moves, frame_index)
+            return
+
         for move in active_moves:
             move_key = (
                 move.get("from"),
@@ -61,7 +80,38 @@ class MoveLog:
             self._logged_move_keys.add(move_key)
             color = piece.token[PIECE_COLOR_INDEX]
             self._move_log_by_color[color].append(
-                self._format_move_log_line(piece.token, move, frame_index)
+                self._format_move_log_line(
+                    piece.token,
+                    move["from"],
+                    move["to"],
+                    frame_index,
+                )
+            )
+            self._trim_move_log(color)
+
+    def _record_completed_moves(self, completed_moves, frame_index: int) -> None:
+        for event in completed_moves:
+            move_key = (
+                event.piece_id,
+                event.from_pos,
+                event.requested_to,
+                event.actual_to,
+                event.reason,
+            )
+
+            if move_key in self._logged_move_keys:
+                continue
+
+            self._logged_move_keys.add(move_key)
+            color = event.token[PIECE_COLOR_INDEX]
+            self._move_log_by_color[color].append(
+                self._format_move_log_line(
+                    event.token,
+                    event.from_pos,
+                    event.actual_to,
+                    frame_index,
+                    event.reason,
+                )
             )
             self._trim_move_log(color)
             

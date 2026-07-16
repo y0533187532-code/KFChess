@@ -55,7 +55,10 @@ class ScriptRunner:
             self._run_print(arguments)
 
     def _run_click(self, arguments):
-        pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
+        #pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
+        pixel_x_text, pixel_y_text = arguments
+        pixel_x = int(pixel_x_text)
+        pixel_y = int(pixel_y_text)
         self._game.handle_click(pixel_x, pixel_y)
 
     def _run_jump(self, arguments):
@@ -75,4 +78,4 @@ class ScriptRunner:
             self._board_printer.print(self._game.snapshot(), self._stdout)
 
 
-CommandRunner = ScriptRunner
+#

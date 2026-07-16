@@ -49,5 +49,5 @@ def test_piece_animator_frame_at_can_chain_state_transitions():
     short_rest_duration = len(animator.animation.frames) / animator.animation.frames_per_sec
     frame_after_rest = animator.frame_at(400.0 + jump_duration + short_rest_duration + 0.02)
 
-    assert animator.state_name == "idle"
+    assert animator.state_name == "long_rest"
     assert frame_after_rest is animator.animation.frames[0]
