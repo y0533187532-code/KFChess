@@ -23,6 +23,9 @@ class Game:
         rest_durations=None,
         promotion_policy=None,
         game_over_piece_type=None,
+        score_policy=None,
+        settings=None,
+        event_bus=None,
     ):
         self._board = board
         piece_rules = piece_rules or PieceRules()
@@ -37,6 +40,9 @@ class Game:
             rest_durations=rest_durations,
             promotion_policy=promotion_policy,
             game_over_piece_type=game_over_piece_type,
+            score_policy=score_policy,
+            settings=settings,
+            event_bus=event_bus,
         )
         self._controller = Controller(board, self._state, self._engine)
 
@@ -58,15 +64,18 @@ class Game:
 
     @_selected.setter
     def _selected(self, value):
-        self._state.selected = value
+        if value is None:
+            self._state.clear_selection()
+        else:
+            self._state.select(*value)
 
     @property
     def _game_over(self):
-        return self._state.game_over
+        return self._state.is_game_over
 
     @_game_over.setter
     def _game_over(self, value):
-        self._state.game_over = value
+        self._state.set_game_over(value)
 
     @property
     def _active_moves(self):
@@ -102,6 +111,12 @@ class Game:
 
     def snapshot(self):
         return self._engine.snapshot()
+
+    def subscribe(self, event_type, subscriber):
+        self._engine.subscribe(event_type, subscriber)
+
+    def unsubscribe(self, event_type, subscriber):
+        self._engine.unsubscribe(event_type, subscriber)
 
     def handle_wait(self, milliseconds):
         self._engine.wait(milliseconds)

@@ -11,38 +11,30 @@ timed collision rules as travel.
 """
 
 try:
-    from ..config import (
-        DEFAULT_JUMP_DURATION_MS,
-        DEFAULT_MOVE_DURATION_MS,
-        DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE,
-        KING_PIECE_TYPE,
-        PIECE_SCORE_VALUES,
-    )
-    from ..engine.types import GameSnapshot, MoveEventSnapshot, MoveResult, PieceSnapshot
-    from ..model.piece import (
-        PIECE_STATE_CAPTURED,
-        PIECE_STATE_MOVING,
-        PIECE_STATE_RESTING,
-    )
+    from ..engine.capture_service import CaptureService, MaterialScorePolicy
+    from ..engine.event_bus import SynchronousEventBus
+    from ..engine.motion_outcome_handler import MotionOutcomeHandler
+    from ..engine.reasons import MoveReason
+    from ..engine.settings import EngineSettings
+    from ..engine.snapshot_builder import SnapshotBuilder
+    from ..engine.types import MoveResult
+    from ..model.events import MoveCompletedEvent
     from ..realtime import RealTimeArbiter
-    from ..realtime.arrival_resolver import apply_arrival
     from ..rules import (
         RuleEngine,
         get_move_route,
         resolve_promotion_piece_type,
     )
 except ImportError:
-    from config import (
-        DEFAULT_JUMP_DURATION_MS,
-        DEFAULT_MOVE_DURATION_MS,
-        DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE,
-        KING_PIECE_TYPE,
-        PIECE_SCORE_VALUES,
-    )
-    from engine.types import GameSnapshot, MoveEventSnapshot, MoveResult, PieceSnapshot
-    from model.piece import PIECE_STATE_CAPTURED, PIECE_STATE_MOVING, PIECE_STATE_RESTING
+    from engine.capture_service import CaptureService, MaterialScorePolicy
+    from engine.event_bus import SynchronousEventBus
+    from engine.motion_outcome_handler import MotionOutcomeHandler
+    from engine.reasons import MoveReason
+    from engine.settings import EngineSettings
+    from engine.snapshot_builder import SnapshotBuilder
+    from engine.types import MoveResult
+    from model.events import MoveCompletedEvent
     from realtime import RealTimeArbiter
-    from realtime.arrival_resolver import apply_arrival
     from rules import (
         RuleEngine,
         get_move_route,
@@ -63,7 +55,7 @@ def default_promotion_policy(
 
 
 class GameEngine:
-    """Coordinates validation, motion scheduling, and arrival resolution."""
+    """Coordinate action requests, motion scheduling, and engine read APIs."""
 
     def __init__(
         self,
@@ -76,31 +68,56 @@ class GameEngine:
         rest_durations=None,
         promotion_policy=None,
         game_over_piece_type=None,
+        score_policy=None,
+        settings=None,
+        snapshot_builder=None,
+        arbiter_factory=None,
+        motion_outcomes=None,
+        event_bus=None,
     ):
         self._board = board
         self._state = state
         self._rule_engine = rule_engine or RuleEngine()
-        self._move_durations = dict(
-            move_durations if move_durations is not None else DEFAULT_MOVE_DURATION_MS
+        if settings is not None and any(
+            value is not None
+            for value in (
+                move_durations,
+                jump_duration_ms,
+                rest_durations,
+                game_over_piece_type,
+            )
+        ):
+            raise ValueError(
+                "Pass either EngineSettings or individual setting overrides, not both"
+            )
+        self._settings = settings or EngineSettings.from_overrides(
+            move_durations=move_durations,
+            jump_duration_ms=jump_duration_ms,
+            rest_durations=rest_durations,
+            game_over_piece_type=game_over_piece_type,
         )
-        self._jump_duration_ms = (
-            jump_duration_ms
-            if jump_duration_ms is not None
-            else DEFAULT_JUMP_DURATION_MS
+        arbiter_type = arbiter_factory or RealTimeArbiter
+        self._arbiter = arbiter or arbiter_type(self)
+        self._event_bus = event_bus or SynchronousEventBus()
+        self._event_bus.subscribe(MoveCompletedEvent, state.move_history)
+        self._capture_service = CaptureService(
+            state,
+            self._arbiter,
+            score_policy or MaterialScorePolicy(),
         )
-        self._rest_durations = dict(
-            rest_durations
-            if rest_durations is not None
-            else DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
+        self._snapshot_builder = snapshot_builder or SnapshotBuilder(
+            board, state, self._rule_engine, self._arbiter
         )
-        self._promotion_policy = promotion_policy or default_promotion_policy
-        self._uses_default_promotion_policy = promotion_policy is None
-        self._game_over_piece_type = (
-            game_over_piece_type
-            if game_over_piece_type is not None
-            else KING_PIECE_TYPE
+        self._motion_outcomes = motion_outcomes or MotionOutcomeHandler(
+            board,
+            state,
+            self._rule_engine,
+            self._arbiter,
+            self._settings,
+            self._capture_service,
+            promotion_policy=promotion_policy,
+            event_publisher=self._event_bus,
         )
-        self._arbiter = arbiter or RealTimeArbiter(self)
 
     @property
     def board(self):
@@ -117,6 +134,10 @@ class GameEngine:
     @property
     def arbiter(self):
         return self._arbiter
+
+    @property
+    def settings(self):
+        return self._settings
 
     @property
     def active_moves(self):
@@ -136,13 +157,13 @@ class GameEngine:
 
     def request_move(self, from_row, from_col, to_row, to_col):
         if self._state.is_game_over:
-            return MoveResult(is_accepted=False, reason="game_over")
+            return MoveResult(is_accepted=False, reason=MoveReason.GAME_OVER)
 
         if (from_row, from_col) in self.moving_origins():
-            return MoveResult(is_accepted=False, reason="piece_in_motion")
+            return MoveResult(is_accepted=False, reason=MoveReason.PIECE_IN_MOTION)
 
         if self.is_piece_resting_at(from_row, from_col):
-            return MoveResult(is_accepted=False, reason="piece_resting")
+            return MoveResult(is_accepted=False, reason=MoveReason.PIECE_RESTING)
 
         validation = self._rule_engine.validate_move(
             self._board, from_row, from_col, to_row, to_col
@@ -157,287 +178,61 @@ class GameEngine:
         self._arbiter.schedule_travel(
             new_from,
             (to_row, to_col),
-            self._move_durations[piece.piece_type] * len(new_route),
+            self._settings.move_duration_for(piece.piece_type) * len(new_route),
             new_route,
             piece.color,
         )
-        return MoveResult(is_accepted=True, reason="ok")
+        return MoveResult(is_accepted=True, reason=MoveReason.OK)
 
     def request_jump(self, from_row, from_col):
         if self._state.is_game_over:
-            return MoveResult(is_accepted=False, reason="game_over")
+            return MoveResult(is_accepted=False, reason=MoveReason.GAME_OVER)
 
         if (from_row, from_col) in self.moving_origins():
-            return MoveResult(is_accepted=False, reason="piece_in_motion")
+            return MoveResult(is_accepted=False, reason=MoveReason.PIECE_IN_MOTION)
 
         if self.is_piece_resting_at(from_row, from_col):
-            return MoveResult(is_accepted=False, reason="piece_resting")
+            return MoveResult(is_accepted=False, reason=MoveReason.PIECE_RESTING)
 
         piece = self._board.get_cell(from_row, from_col)
         if piece is None:
-            return MoveResult(is_accepted=False, reason="empty_source")
+            return MoveResult(is_accepted=False, reason=MoveReason.EMPTY_SOURCE)
 
         self._arbiter.schedule_jump(
             (from_row, from_col),
-            self._jump_duration_ms,
+            self._settings.jump_duration_ms,
             piece.color,
             piece,
         )
-        return MoveResult(is_accepted=True, reason="ok")
+        return MoveResult(is_accepted=True, reason=MoveReason.OK)
 
     def wait(self, milliseconds):
         """Advance simulated time and resolve arrivals."""
         self._arbiter.advance_time(milliseconds)
 
     def snapshot(self):
-        moving_origins = self.moving_origins()
-        pieces = []
-        active_jump_piece_ids = {
-            move["piece"].piece_id
-            for move in self._arbiter.active_moves
-            if move.get("jump") and move.get("piece") is not None
-        }
-        for row in range(self._board.num_rows):
-            for col in range(self._board.num_cols):
-                piece = self._board.get_cell(row, col)
-                if piece is not None:
-                    if piece.piece_id in active_jump_piece_ids:
-                        continue
-                    rest_remaining_ms = None
-                    active_motion = self._active_motion_from(row, col, piece.piece_id)
-                    if active_motion is not None and active_motion.get("jump"):
-                        state = "jump"
-                    elif active_motion is not None:
-                        state = PIECE_STATE_MOVING
-                    else:
-                        rest_remaining_ms = self._arbiter.rest_remaining_ms(piece.piece_id)
-                        if rest_remaining_ms is not None:
-                            state = PIECE_STATE_RESTING
-                        else:
-                            state = piece.state
-                    if (row, col) in moving_origins:
-                        rest_remaining_ms = None
-                    elif rest_remaining_ms is not None:
-                        state = PIECE_STATE_RESTING
-                    pieces.append(
-                        PieceSnapshot(
-                            row=row,
-                            col=col,
-                            token=piece.token,
-                            piece_id=piece.piece_id,
-                            state=state,
-                            rest_remaining_ms=rest_remaining_ms,
-                        )
-                    )
-        for move in self._arbiter.active_moves:
-            if not move.get("jump") or move.get("piece") is None:
-                continue
-            jump_row, jump_col = move["from"]
-            jump_piece = move["piece"]
-            pieces.append(
-                PieceSnapshot(
-                    row=jump_row,
-                    col=jump_col,
-                    token=jump_piece.token,
-                    piece_id=jump_piece.piece_id,
-                    state="jump",
-                    rest_remaining_ms=None,
-                )
-            )
-        for piece, row, col in self._state.captured_pieces:
-            pieces.append(
-                PieceSnapshot(
-                    row=row,
-                    col=col,
-                    token=piece.token,
-                    piece_id=piece.piece_id,
-                    state=PIECE_STATE_CAPTURED,
-                )
-            )
-        return GameSnapshot(
-            board_width=self._board.num_cols,
-            board_height=self._board.num_rows,
-            game_over=self._state.is_game_over,
-            selected=self._state.selected,
-            pieces=tuple(pieces),
-            legal_destinations=self._legal_destinations_for_selected(),
-            score_by_color=dict(self._state.score_by_color),
-            completed_moves=tuple(
-                MoveEventSnapshot(
-                    piece_id=event["piece_id"],
-                    token=event["token"],
-                    from_pos=event["from"],
-                    requested_to=event["requested_to"],
-                    actual_to=event["actual_to"],
-                    reason=event["reason"],
-                )
-                for event in self._state.completed_moves
-            ),
-        )
+        return self._snapshot_builder.build()
 
-    def _active_motion_from(self, row, col, piece_id=None):
-        for motion in self._arbiter.active_moves:
-            moving_piece = motion.get("piece")
-            if (
-                piece_id is not None
-                and moving_piece is not None
-                and moving_piece.piece_id != piece_id
-            ):
-                continue
-            if motion["from"] == (row, col):
-                return motion
-        return None
+    def subscribe(self, event_type, subscriber):
+        self._event_bus.subscribe(event_type, subscriber)
+
+    def unsubscribe(self, event_type, subscriber):
+        self._event_bus.unsubscribe(event_type, subscriber)
 
     def clear_source_cell(self, from_row, from_col):
-        self._board.clear_cell(from_row, from_col)
+        self._motion_outcomes.clear_source_cell(from_row, from_col)
 
     def execute_move(self, move):
-        to_row, to_col = move["to"]
-        self.execute_move_to_cell(move, to_row, to_col)
+        self._motion_outcomes.execute_move(move)
 
     def execute_move_to_cell(self, move, to_row, to_col):
-        from_row, from_col = move["from"]
-        moving = self._board.get_cell(from_row, from_col)
-        if moving is None:
-            return
-        moving_piece_id = moving.piece_id
-        requested_to = move["to"]
-        promotion = self._resolve_promotion(moving, to_row)
-        result = apply_arrival(
-            self._board,
-            from_row,
-            from_col,
-            to_row,
-            to_col,
-            move["color"],
-            promotion_piece_type=promotion,
-            game_over_piece_type=self._game_over_piece_type,
-        )
-        self._arbiter.clear_rest(moving_piece_id)
-        self._start_rest_for_piece_at(to_row, to_col)
-        arrived_piece = self._board.get_cell(to_row, to_col)
-        reason = self._completion_reason(requested_to, (to_row, to_col), result)
-        if arrived_piece is not None:
-            self._state.record_completed_move(
-                piece_id=moving_piece_id,
-                token=arrived_piece.token,
-                from_pos=(from_row, from_col),
-                requested_to=requested_to,
-                actual_to=(to_row, to_col),
-                reason=reason,
-            )
-        if result.captured_piece is not None:
-            self._state.record_capture(result.captured_piece, to_row, to_col)
-            if result.captured_piece.color != move["color"]:
-                points = PIECE_SCORE_VALUES.get(result.captured_piece.piece_type, 0)
-                self._state.add_score(move["color"], points)
-            self._arbiter.clear_rest(result.captured_piece.piece_id)
-            self._cancel_motions_from(to_row, to_col)
-        if result.king_captured:
-            self._state.mark_game_over()
+        self._motion_outcomes.execute_move_to_cell(move, to_row, to_col)
 
     def execute_move_to_airborne_origin(self, move, to_row, to_col):
-        self._board.clear_cell(to_row, to_col)
-        self.execute_move_to_cell(move, to_row, to_col)
+        self._motion_outcomes.execute_move_to_airborne_origin(move, to_row, to_col)
 
     def complete_jump(self, move):
-        row, col = move["from"]
-        jumper = move.get("piece")
-        if jumper is None:
-            return
-
-        occupant = self._board.get_cell(row, col)
-        if occupant is not None and occupant.piece_id == jumper.piece_id:
-            return
-
-        if occupant is not None:
-            captured = occupant.with_state(PIECE_STATE_CAPTURED)
-            self._state.record_capture(captured, row, col)
-            if occupant.color != jumper.color:
-                points = PIECE_SCORE_VALUES.get(occupant.piece_type, 0)
-                self._state.add_score(jumper.color, points)
-            self._arbiter.clear_rest(occupant.piece_id)
-            self._board.clear_cell(row, col)
-
-        self._board.place_piece(row, col, jumper)
-        self._start_rest_for_piece_at(row, col)
-
-    def _cancel_motions_from(self, row, col):
-        for motion in list(self._arbiter.active_moves):
-            if motion["from"] == (row, col):
-                self.cancel_motion(motion, captured_at=(row, col))
+        self._motion_outcomes.complete_jump(move)
 
     def cancel_motion(self, motion, captured_at=None):
-        try:
-            from ..realtime.collision import clear_motion_transit
-        except ImportError:
-            from realtime.collision import clear_motion_transit
-
-        clear_motion_transit(motion)
-        from_row, from_col = motion["from"]
-        piece = self._board.get_cell(from_row, from_col)
-        if piece is not None and piece.color == motion["color"]:
-            if captured_at is not None:
-                cap_row, cap_col = captured_at
-                self._arbiter.clear_rest(piece.piece_id)
-                self._state.record_capture(
-                    piece.with_state(PIECE_STATE_CAPTURED), cap_row, cap_col
-                )
-            self._board.clear_cell(from_row, from_col)
-        while motion in self._arbiter.active_moves:
-            self._arbiter.active_moves.remove(motion)
-
-    def _start_rest_for_piece_at(self, row, col):
-        piece = self._board.get_cell(row, col)
-        if piece is None:
-            return
-        rest_ms = self._rest_durations.get(piece.piece_type, 0)
-        if rest_ms > 0:
-            self._arbiter.start_rest(piece.piece_id, rest_ms)
-
-    def _completion_reason(self, requested_to, actual_to, result):
-        if result.captured_piece is not None:
-            return "capture"
-        if actual_to != requested_to:
-            return "same_color_blocked"
-        return "completed"
-
-    def _legal_destinations_for_selected(self):
-        selected = self._state.selected
-        if selected is None:
-            return ()
-
-        row, col = selected
-        piece = self._board.get_cell(row, col)
-        if piece is None:
-            return ()
-        if (row, col) in self.moving_origins():
-            return ()
-        if self.is_piece_resting_at(row, col):
-            return ()
-
-        destinations = self._rule_engine.piece_rules.legal_destinations(
-            self._board, piece, row, col
-        )
-        ordered = sorted((position.row, position.col) for position in destinations)
-        return tuple(ordered)
-
-    def _resolve_promotion(self, moving, to_row):
-        chosen_type = self._state.promotion_choice
-        piece_rules = self._rule_engine.piece_rules
-        if self._uses_default_promotion_policy:
-            promotion = resolve_promotion_piece_type(
-                moving,
-                to_row,
-                self._board.num_rows,
-                piece_rules,
-                chosen_type=chosen_type,
-            )
-        else:
-            promotion = self._promotion_policy(
-                moving, to_row, self._board.num_rows, chosen_type=chosen_type
-            )
-
-        if promotion is not None:
-            self._state.consume_promotion_choice()
-        return promotion
+        self._motion_outcomes.cancel_motion(motion, captured_at=captured_at)

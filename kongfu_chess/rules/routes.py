@@ -1,10 +1,12 @@
 try:
-    from ..config import PAWN_PIECE_TYPE
+    from ..config import KING_PIECE_TYPE, KNIGHT_PIECE_TYPE, PAWN_PIECE_TYPE
 except ImportError:
-    from config import PAWN_PIECE_TYPE
+    from config import KING_PIECE_TYPE, KNIGHT_PIECE_TYPE, PAWN_PIECE_TYPE
 
 
-JUMPING_PIECE_TYPES = frozenset({"K", "N", "P"})
+JUMPING_PIECE_TYPES = frozenset(
+    {KING_PIECE_TYPE, KNIGHT_PIECE_TYPE, PAWN_PIECE_TYPE}
+)
 
 
 def get_move_route(from_row, from_col, to_row, to_col, piece_type):

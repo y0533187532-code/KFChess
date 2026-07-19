@@ -4,7 +4,10 @@ import io
 
 import pytest
 
-from kongfu_chess.config import DEFAULT_JUMP_DURATION_MS
+from kongfu_chess.config import (
+    DEFAULT_JUMP_DURATION_MS,
+    DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE,
+)
 from kongfu_chess.engine.game_engine import GameEngine
 from kongfu_chess.engine.types import MoveResult
 from kongfu_chess.game import Game
@@ -89,7 +92,7 @@ def test_request_jump_rejects_empty_source():
 def test_jump_mid_air_keeps_piece_on_logical_board():
     board, _, engine = make_engine([["wK"]])
     engine.request_jump(0, 0)
-    engine.wait(500)
+    engine.wait(DEFAULT_JUMP_DURATION_MS // 2)
     assert board.get_cell(0, 0).token == "wK"
     assert engine.has_active_motion() is True
 
@@ -100,6 +103,33 @@ def test_jump_landing_removes_motion_without_moving_piece():
     finish_jump(engine)
     assert board.get_cell(0, 0).token == "wK"
     assert engine.active_moves == []
+
+
+def test_jump_landing_starts_rest_timer():
+    board, _, engine = make_engine([["wK"]])
+    piece_id = board.get_cell(0, 0).piece_id
+
+    engine.request_jump(0, 0)
+    finish_jump(engine)
+
+    assert engine.arbiter.active_rests[piece_id] == DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE["K"]
+
+
+def test_jump_landing_records_completed_move():
+    board, state, engine = make_engine([["wK"]])
+    piece_id = board.get_cell(0, 0).piece_id
+
+    engine.request_jump(0, 0)
+    finish_jump(engine)
+
+    assert state.completed_moves[-1] == {
+        "piece_id": piece_id,
+        "token": "wK",
+        "from": (0, 0),
+        "requested_to": (0, 0),
+        "actual_to": (0, 0),
+        "reason": "jump",
+    }
 
 
 # --- Airborne capture ---

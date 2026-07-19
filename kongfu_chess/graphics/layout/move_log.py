@@ -1,3 +1,9 @@
+try:
+    from ...engine.reasons import CompletionReason
+except ImportError:
+    from engine.reasons import CompletionReason
+
+
 PIECE_COLOR_INDEX = 0
 PIECE_TYPE_INDEX = 1
 MAX_MOVE_LOG_LINES = 8
@@ -12,8 +18,8 @@ PIECE_TYPE_NAMES = {
 }
 
 MOVE_REASON_LABELS = {
-    "capture": " (capture)",
-    "same_color_blocked": " (blocked)",
+    CompletionReason.CAPTURE: " (capture)",
+    CompletionReason.SAME_COLOR_BLOCKED: " (blocked)",
 }
 
 
@@ -54,6 +60,9 @@ class MoveLog:
         to_cell = self._cell_name(to_row, to_col)
         piece_name = self._piece_name(token)
         reason_label = MOVE_REASON_LABELS.get(reason, "")
+
+        if reason == CompletionReason.JUMP:
+            return f"{seconds:.1f}s {piece_name}: jump {from_cell}"
 
         return f"{seconds:.1f}s {piece_name}: {from_cell}->{to_cell}{reason_label}"
         

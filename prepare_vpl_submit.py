@@ -94,7 +94,18 @@ def main():
 
     engine_out = OUT / "engine"
     engine_out.mkdir()
-    for name in ("__init__.py", "types.py", "game_engine.py"):
+    for name in (
+        "__init__.py",
+        "capture_service.py",
+        "event_bus.py",
+        "game_engine.py",
+        "motion_outcome_handler.py",
+        "ports.py",
+        "reasons.py",
+        "settings.py",
+        "snapshot_builder.py",
+        "types.py",
+    ):
         shutil.copy2(PKG / "engine" / name, engine_out / name)
 
     realtime_out = OUT / "realtime"
@@ -116,7 +127,15 @@ def main():
 
     model_out = OUT / "model"
     model_out.mkdir()
-    for name in ("__init__.py", "position.py", "game_state.py", "board.py", "piece.py"):
+    for name in (
+        "__init__.py",
+        "board.py",
+        "events.py",
+        "game_state.py",
+        "move_history.py",
+        "piece.py",
+        "position.py",
+    ):
         shutil.copy2(PKG / "model" / name, model_out / name)
 
     shutil.copy2(PKG / "io" / "board_printer.py", OUT / "board_printer.py")

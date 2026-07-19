@@ -21,6 +21,7 @@ except ImportError:
 
 PIECE_STATE_IDLE = "idle"
 PIECE_STATE_MOVING = "moving"
+PIECE_STATE_JUMPING = "jump"
 PIECE_STATE_RESTING = "resting"
 PIECE_STATE_CAPTURED = "captured"
 

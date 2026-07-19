@@ -1,5 +1,14 @@
+from types import MappingProxyType
+
+from kongfu_chess.config import DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
 from kongfu_chess.engine.types import GameSnapshot
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
+from kongfu_chess.model.piece import (
+    PIECE_STATE_CAPTURED,
+    PIECE_STATE_IDLE,
+    PIECE_STATE_JUMPING,
+    PIECE_STATE_MOVING,
+    PIECE_STATE_RESTING,
+)
 from .layout.move_log import MoveLog
 from .board.board_view import (
     draw_legal_destination,
@@ -9,6 +18,7 @@ from .board.board_view import (
 )
 from .core.img import Img
 from .pieces.piece_animation_manager import PieceAnimationManager
+from .pieces.piece_assets import TOKEN_PIECE_TYPE_INDEX
 from .pieces.piece_positioner import PiecePositioner
 from .layout.player_panel import PlayerPanel
 from .layout.screen_layout import (
@@ -19,30 +29,40 @@ from .layout.screen_layout import (
 )
 
 
-DEFAULT_REST_TOTAL_MS = 2000
+ASSET_STATE_IDLE = "idle"
+ASSET_STATE_MOVE = "move"
+ASSET_STATE_JUMP = "jump"
+ASSET_STATE_LONG_REST = "long_rest"
 
 
 class GameView:
     """Render the current game snapshot with animated pieces."""
 
     _STATE_TO_ASSET_STATE = {
-        "idle": "idle",
-        "moving": "move",
-        "move": "move",
-        "jump": "jump",
-        "captured": "idle",
-        "selected": "idle",
-        "resting": "long_rest",
+        PIECE_STATE_IDLE: ASSET_STATE_IDLE,
+        PIECE_STATE_MOVING: ASSET_STATE_MOVE,
+        ASSET_STATE_MOVE: ASSET_STATE_MOVE,
+        PIECE_STATE_JUMPING: ASSET_STATE_JUMP,
+        PIECE_STATE_CAPTURED: ASSET_STATE_IDLE,
+        "selected": ASSET_STATE_IDLE,
+        PIECE_STATE_RESTING: ASSET_STATE_LONG_REST,
         "short_rest": "short_rest",
-        "long_rest": "long_rest",
+        ASSET_STATE_LONG_REST: ASSET_STATE_LONG_REST,
     }
 
-    def __init__(self):
+    def __init__(self, rest_durations=None):
         self._animation_manager = PieceAnimationManager()
         self._positioner = PiecePositioner()
         self._move_log = MoveLog()
         self._frame_index = 0
         self._player_panel = PlayerPanel()
+        self._rest_durations = MappingProxyType(
+            dict(
+                DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
+                if rest_durations is None
+                else rest_durations
+            )
+        )
 
     @property
     def _animators_by_piece_id(self):
@@ -73,7 +93,7 @@ class GameView:
                     piece.row,
                     piece.col,
                     piece.rest_remaining_ms,
-                    DEFAULT_REST_TOTAL_MS,
+                    self._rest_duration_for(piece),
                 )
 
         for row, col in snapshot.legal_destinations:
@@ -99,4 +119,8 @@ class GameView:
 
     def _asset_state_for(self, state: str) -> str:
         """Map logical piece states to the available asset state folders."""
-        return self._STATE_TO_ASSET_STATE.get(state, "idle")
+        return self._STATE_TO_ASSET_STATE.get(state, ASSET_STATE_IDLE)
+
+    def _rest_duration_for(self, piece) -> int:
+        piece_type = piece.token[TOKEN_PIECE_TYPE_INDEX]
+        return self._rest_durations.get(piece_type, piece.rest_remaining_ms)

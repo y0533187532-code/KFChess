@@ -5,7 +5,10 @@ try:
         DEFAULT_NON_PROMOTABLE_PROMOTION_TYPES,
         DEFAULT_PAWN_FORWARD_BY_COLOR,
         DEFAULT_PAWN_START_ROW_BY_COLOR,
+        BISHOP_PIECE_TYPE,
         PAWN_PIECE_TYPE,
+        QUEEN_PIECE_TYPE,
+        ROOK_PIECE_TYPE,
     )
     from ..model.position import Position
     from .path import is_path_clear
@@ -16,7 +19,10 @@ except ImportError:
         DEFAULT_NON_PROMOTABLE_PROMOTION_TYPES,
         DEFAULT_PAWN_FORWARD_BY_COLOR,
         DEFAULT_PAWN_START_ROW_BY_COLOR,
+        BISHOP_PIECE_TYPE,
         PAWN_PIECE_TYPE,
+        QUEEN_PIECE_TYPE,
+        ROOK_PIECE_TYPE,
     )
     from model.position import Position
     from rules.path import is_path_clear
@@ -24,7 +30,9 @@ except ImportError:
     from rules.shapes import DEFAULT_SHAPE_RULES
 
 
-DEFAULT_SLIDING_PIECE_TYPES = frozenset({"R", "B", "Q"})
+DEFAULT_SLIDING_PIECE_TYPES = frozenset(
+    {ROOK_PIECE_TYPE, BISHOP_PIECE_TYPE, QUEEN_PIECE_TYPE}
+)
 
 
 class PieceRules:

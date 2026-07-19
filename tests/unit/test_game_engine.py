@@ -2,6 +2,7 @@ import pytest
 
 from kongfu_chess.engine.game_engine import GameEngine
 from kongfu_chess.engine.types import MoveResult, PieceSnapshot
+from kongfu_chess.config import DEFAULT_MOVE_DURATION_MS, DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.game_state import GameState
 from kongfu_chess.model.piece import (
@@ -18,6 +19,10 @@ def make_engine(rows):
     state = GameState(board=board)
     engine = GameEngine(board, state, RuleEngine())
     return board, state, engine
+
+
+KING_REST_MS = DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE["K"]
+KING_MOVE_MS = DEFAULT_MOVE_DURATION_MS["K"]
 
 
 def test_request_move_rejects_game_over_before_validation():
@@ -85,7 +90,7 @@ def test_request_move_rejects_friendly_destination():
 def test_wait_delegates_to_arbiter_without_board_change_mid_flight():
     board, _, engine = make_engine([["wK", "."]])
     engine.request_move(0, 0, 0, 1)
-    engine.wait(500)
+    engine.wait(KING_MOVE_MS - 1)
     assert board.get_cell(0, 0).token == "wK"
     assert engine.has_active_motion() is True
 
@@ -127,7 +132,7 @@ def test_snapshot_returns_mover_to_idle_after_arrival():
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert arrived.state == PIECE_STATE_RESTING
-    assert arrived.rest_remaining_ms == 2000
+    assert arrived.rest_remaining_ms == KING_REST_MS
     assert arrived.row == 0 and arrived.col == 1
     assert board.get_cell(0, 1).state == PIECE_STATE_IDLE
 
@@ -158,7 +163,7 @@ def test_snapshot_marks_captured_victim_after_arrival():
     assert captured.row == 0 and captured.col == 1
     attacker = next(p for p in after.pieces if p.piece_id == attacker_id)
     assert attacker.state == PIECE_STATE_RESTING
-    assert attacker.rest_remaining_ms == 2000
+    assert attacker.rest_remaining_ms == KING_REST_MS
 
 
 def test_request_move_rejects_second_move_while_piece_is_travelling():
@@ -202,7 +207,7 @@ def test_piece_may_move_again_after_motion_completes():
     assert engine.active_moves == []
     result = engine.request_move(0, 1, 0, 2)
     assert result == MoveResult(is_accepted=False, reason="piece_resting")
-    engine.wait(2000)
+    engine.wait(KING_REST_MS)
     result = engine.request_move(0, 1, 0, 2)
     assert result == MoveResult(is_accepted=True, reason="ok")
     assert len(engine.active_moves) == 1
@@ -231,7 +236,7 @@ def test_snapshot_returns_idle_after_rest_expires():
     piece_id = board.get_cell(0, 0).piece_id
     engine.request_move(0, 0, 0, 1)
     engine.wait(1000)
-    engine.wait(2000)
+    engine.wait(KING_REST_MS)
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert arrived.state == PIECE_STATE_IDLE
@@ -247,7 +252,7 @@ def test_snapshot_returns_partial_rest_remaining_ms():
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
     assert arrived.state == PIECE_STATE_RESTING
-    assert arrived.rest_remaining_ms == 1500
+    assert arrived.rest_remaining_ms == KING_REST_MS - 500
 
 
 def test_snapshot_has_no_legal_destinations_when_nothing_selected():

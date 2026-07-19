@@ -9,6 +9,7 @@ try:
         PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    from ..input.board_mapper import BoardMapper
     from ..io.board_printer import BoardPrinter
 except ImportError:
     from config import (
@@ -19,6 +20,10 @@ except ImportError:
         PROMOTE_COMMAND,
         WAIT_COMMAND,
     )
+    try:
+        from board_mapper import BoardMapper
+    except ImportError:
+        from input.board_mapper import BoardMapper  # pragma: no cover
     try:
         from board_printer import BoardPrinter
     except ImportError:
@@ -55,16 +60,19 @@ class ScriptRunner:
             self._run_print(arguments)
 
     def _run_click(self, arguments):
-        #pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
         pixel_x_text, pixel_y_text = arguments
         pixel_x = int(pixel_x_text)
         pixel_y = int(pixel_y_text)
         self._game.handle_click(pixel_x, pixel_y)
 
     def _run_jump(self, arguments):
-        pixel_x, pixel_y = int(arguments[0]), int(arguments[1])
-        self._game.handle_click(pixel_x, pixel_y)
-        self._game.handle_click(pixel_x, pixel_y)
+        pixel_x_text, pixel_y_text = arguments
+        pixel_x = int(pixel_x_text)
+        pixel_y = int(pixel_y_text)
+        cell = BoardMapper().pixel_to_cell(pixel_x, pixel_y, self._board)
+        if cell is None:
+            return
+        self._game.request_jump(cell.row, cell.col)
 
     def _run_wait(self, arguments):
         milliseconds = int(arguments[0])
@@ -76,6 +84,3 @@ class ScriptRunner:
     def _run_print(self, arguments):
         if arguments and arguments[0] == PRINT_BOARD_ARGUMENT:
             self._board_printer.print(self._game.snapshot(), self._stdout)
-
-
-#

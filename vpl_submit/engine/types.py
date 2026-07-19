@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Mapping
+
+try:
+    from ..model.piece import PIECE_STATE_IDLE
+except ImportError:
+    from model.piece import PIECE_STATE_IDLE
 
 
 @dataclass(frozen=True)
@@ -25,7 +32,7 @@ class PieceSnapshot:
     col: int
     token: str
     piece_id: int
-    state: str = "idle"
+    state: str = PIECE_STATE_IDLE
     rest_remaining_ms: int | None = None
 
 
@@ -46,8 +53,13 @@ class GameSnapshot:
     board_width: int
     board_height: int
     game_over: bool
-    selected: tuple | None = None
+    selected: tuple[int, int] | None = None
     pieces: tuple[PieceSnapshot, ...] = field(default_factory=tuple)
     legal_destinations: tuple[tuple[int, int], ...] = field(default_factory=tuple)
-    score_by_color: dict[str, int] = field(default_factory=dict)
+    score_by_color: Mapping[str, int] = field(default_factory=dict)
     completed_moves: tuple[MoveEventSnapshot, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "score_by_color", MappingProxyType(dict(self.score_by_color))
+        )

@@ -136,6 +136,31 @@ def test_record_new_moves_marks_completed_capture():
     assert right_lines == ["Black", "0.0s Bishop: b7->a8 (capture)"]
 
 
+def test_record_new_moves_marks_completed_jump():
+    move_log = MoveLog()
+    snapshot = GameSnapshot(
+        board_width=8,
+        board_height=8,
+        game_over=False,
+        completed_moves=(
+            MoveEventSnapshot(
+                piece_id=3,
+                token="wN",
+                from_pos=(7, 1),
+                requested_to=(7, 1),
+                actual_to=(7, 1),
+                reason="jump",
+            ),
+        ),
+    )
+
+    move_log.record_new_moves(snapshot, active_moves=[], frame_index=0)
+
+    left_lines, right_lines = move_log.lines_by_color()
+    assert left_lines == ["White", "0.0s Knight: jump b1"]
+    assert right_lines == ["Black"]
+
+
 def test_cell_name_converts_board_position_to_chess_name():
     move_log = MoveLog()
 

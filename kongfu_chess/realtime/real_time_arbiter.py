@@ -1,5 +1,7 @@
 """Deterministic virtual-time resolution for in-flight motions."""
 
+from types import MappingProxyType
+
 try:
     from .airborne_jump import is_jump_motion
     from .collision import (
@@ -38,7 +40,7 @@ class RealTimeArbiter:
 
     @property
     def active_rests(self):
-        return self._active_rests
+        return MappingProxyType(self._active_rests)
 
     def moving_origins(self):
         return {move["from"] for move in self._active_moves}
@@ -58,6 +60,12 @@ class RealTimeArbiter:
         if piece_id is None:
             return
         self._active_rests.pop(piece_id, None)
+
+    def remove_motion(self, motion):
+        """Remove a scheduled motion without exposing collection mutation."""
+        clear_motion_transit(motion)
+        while motion in self._active_moves:
+            self._active_moves.remove(motion)
 
     def schedule_travel(self, from_pos, to_pos, remaining_ms, route, color):
         cell_ms = remaining_ms // max(1, len(route))
@@ -137,9 +145,7 @@ class RealTimeArbiter:
         self._remove_active_move(move)
 
     def _remove_active_move(self, move):
-        clear_motion_transit(move)
-        while move in self._active_moves:
-            self._active_moves.remove(move)
+        self.remove_motion(move)
 
     def _advance_rests(self, milliseconds):
         expired_piece_ids = []

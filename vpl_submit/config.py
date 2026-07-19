@@ -28,11 +28,9 @@ EMPTY_CELL_TOKEN = "."
 TOKEN_LENGTH = 2  # e.g. "wP" = color + piece type
 
 # --- Default rule-set for a "standard" Kong-Fu-Chess game ---
-DEFAULT_VALID_PIECE_TYPES = frozenset({"K", "Q", "R", "B", "N", "P"})
-DEFAULT_VALID_COLORS = frozenset({"w", "b"})
-
 WHITE_COLOR = "w"
 BLACK_COLOR = "b"
+DEFAULT_VALID_COLORS = frozenset({WHITE_COLOR, BLACK_COLOR})
 
 # Piece type letter for the pawn - used by Game to dispatch to the
 # context-aware is_legal_pawn instead of the generic is_legal.
@@ -41,9 +39,24 @@ PAWN_PIECE_TYPE = "P"
 # Piece type letter for the king - used by Game to detect game-over on capture.
 KING_PIECE_TYPE = "K"
 
+ROOK_PIECE_TYPE = "R"
+BISHOP_PIECE_TYPE = "B"
+KNIGHT_PIECE_TYPE = "N"
+
 # Piece type letter a pawn promotes to when no explicit choice is supplied.
 DEFAULT_PROMOTION_PIECE_TYPE = "Q"
 QUEEN_PIECE_TYPE = DEFAULT_PROMOTION_PIECE_TYPE
+
+DEFAULT_VALID_PIECE_TYPES = frozenset(
+    {
+        KING_PIECE_TYPE,
+        QUEEN_PIECE_TYPE,
+        ROOK_PIECE_TYPE,
+        BISHOP_PIECE_TYPE,
+        KNIGHT_PIECE_TYPE,
+        PAWN_PIECE_TYPE,
+    }
+)
 
 # Piece types excluded from promotion targets when deriving from registered shapes.
 DEFAULT_NON_PROMOTABLE_PROMOTION_TYPES = frozenset({KING_PIECE_TYPE, PAWN_PIECE_TYPE})
@@ -72,39 +85,25 @@ PRINT_BOARD_ARGUMENT = "board"
 
 # --- Airborne jump duration (milliseconds) ---
 # Injectable via Game(jump_duration_ms=...) for custom games.
-DEFAULT_JUMP_DURATION_MS = 1000
+DEFAULT_JUMP_DURATION_MS = 500
 
 # --- Real-time move travel durations (milliseconds per piece type) ---
 # Injectable via Game(move_durations=...) for custom games.
-DEFAULT_MOVE_DURATION_MS = {
-    "K": 1000,
-    "Q": 1000,
-    "R": 1000,
-    "B": 1000,
-    "N": 1000,
-    "P": 1000,
-}
+DEFAULT_MOVE_DURATION_MS = dict.fromkeys(DEFAULT_VALID_PIECE_TYPES, 500)
 
 # --- Post-move rest durations (milliseconds per piece type) ---
 # After a piece finishes an accepted travel move, it must rest before it can
 # be selected or moved again. Injectable via Game/GameEngine for custom games.
-DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE = {
-    "K": 2000,
-    "Q": 2000,
-    "R": 2000,
-    "B": 2000,
-    "N": 2000,
-    "P": 2000,
-}
+DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE = dict.fromkeys(DEFAULT_VALID_PIECE_TYPES, 800)
 
 # --- Capture score values by piece type ---
 PIECE_SCORE_VALUES = {
-    "P": 1,
-    "N": 3,
-    "B": 3,
-    "R": 5,
-    "Q": 9,
-    "K": 0,
+    PAWN_PIECE_TYPE: 1,
+    KNIGHT_PIECE_TYPE: 3,
+    BISHOP_PIECE_TYPE: 3,
+    ROOK_PIECE_TYPE: 5,
+    QUEEN_PIECE_TYPE: 9,
+    KING_PIECE_TYPE: 0,
 }
 
 class ErrorCode:

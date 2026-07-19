@@ -65,6 +65,19 @@ def test_draw_side_panel_text_changes_panel_pixels():
     assert (before != screen.img).any()
 
 
+def test_draw_side_panel_text_draws_score_labels():
+    screen = build_screen_canvas()
+    before = screen.img.copy()
+
+    draw_side_panel_text(
+        screen,
+        ["White", "Score: 7", "Moves:"],
+        ["Black", "Score: 3", "Moves:"],
+    )
+
+    assert (before != screen.img).any()
+
+
 def test_screen_to_board_pixels_converts_click_inside_board():
     assert screen_to_board_pixels(BOARD_X_PX + 12, BOARD_Y_PX + 34) == (12, 34)
 

@@ -3,7 +3,7 @@ from ..core.img import Img
 
 
 HEADER_HEIGHT_PX = 95
-FOOTER_HEIGHT_PX = 70
+FOOTER_HEIGHT_PX = 100
 SIDE_PANEL_WIDTH_PX = 250
 BOARD_LABEL_MARGIN_PX = 45
 SCREEN_WIDTH_PX = BOARD_SIZE_PX + SIDE_PANEL_WIDTH_PX * 2 + BOARD_LABEL_MARGIN_PX * 2
@@ -20,7 +20,7 @@ TABLE_HEADER_COLOR = (255, 255, 255, 255)
 TEXT_COLOR = (25, 25, 25, 255)
 BOARD_LABEL_COLOR = (15, 15, 15, 255)
 TABLE_ROW_HEIGHT_PX = 27
-TABLE_TITLE_HEIGHT_PX = 40
+TABLE_TITLE_HEIGHT_PX = 58
 TABLE_COLUMN_HEADER_HEIGHT_PX = 32
 TABLE_X_PADDING_PX = 25
 
@@ -48,10 +48,10 @@ def draw_status_text(screen: Img, text: str) -> None:
     screen.put_text(
         text,
         x=BOARD_X_PX,
-        y=45,
-        font_size=0.75,
+        y=35,
+        font_size=0.55,
         color=TEXT_COLOR,
-        thickness=2,
+        thickness=1,
     )
 
 
@@ -82,6 +82,30 @@ def draw_side_panel_text(screen: Img, left_lines: list[str], right_lines: list[s
         x=BOARD_X_PX + BOARD_SIZE_PX + BOARD_LABEL_MARGIN_PX + TABLE_X_PADDING_PX,
         y=HEADER_HEIGHT_PX - 35,
         lines=right_lines,
+    )
+
+
+def draw_score_labels(screen: Img, left_lines: list[str], right_lines: list[str]) -> None:
+    """Draw both player scores around the board, like the reference layout."""
+    black_score = _score_line_from_panel(right_lines)
+    white_score = _score_line_from_panel(left_lines)
+    center_x = BOARD_X_PX + BOARD_SIZE_PX // 2 - 55
+
+    screen.put_text(
+        black_score,
+        x=center_x,
+        y=62,
+        font_size=0.55,
+        color=TEXT_COLOR,
+        thickness=1,
+    )
+    screen.put_text(
+        white_score,
+        x=center_x,
+        y=BOARD_Y_PX + BOARD_SIZE_PX + 78,
+        font_size=0.55,
+        color=TEXT_COLOR,
+        thickness=1,
     )
 
 
@@ -149,6 +173,7 @@ def draw_move_table(screen: Img, x: int, y: int, lines: list[str]) -> None:
     table_width = SIDE_PANEL_WIDTH_PX - TABLE_X_PADDING_PX * 2
     time_col_width = 105
     title = lines[0] if lines else ""
+    score = _score_line_from_panel(lines)
     moves = _move_lines_from_panel(lines)
     table_height = (
         TABLE_TITLE_HEIGHT_PX
@@ -168,7 +193,8 @@ def draw_move_table(screen: Img, x: int, y: int, lines: list[str]) -> None:
     )
     _draw_table_grid(screen, x, y, table_width, table_height, time_col_width)
 
-    screen.put_text(title, x=x + table_width // 2 - 35, y=y + 27, font_size=0.55, color=TEXT_COLOR, thickness=2)
+    screen.put_text(title, x=x + table_width // 2 - 45, y=y + 23, font_size=0.55, color=TEXT_COLOR, thickness=2)
+    screen.put_text(score, x=x + table_width // 2 - 35, y=y + 45, font_size=0.45, color=TEXT_COLOR, thickness=1)
     header_y = y + TABLE_TITLE_HEIGHT_PX + 22
     screen.put_text("Time", x=x + 25, y=header_y, font_size=0.55, color=TEXT_COLOR, thickness=2)
     screen.put_text("Move", x=x + time_col_width + 30, y=header_y, font_size=0.55, color=TEXT_COLOR, thickness=2)
@@ -182,6 +208,13 @@ def draw_move_table(screen: Img, x: int, y: int, lines: list[str]) -> None:
 
 def _move_lines_from_panel(lines: list[str]) -> list[str]:
     return [line for line in lines[1:] if line != "Moves:" and not line.startswith("Score:")]
+
+
+def _score_line_from_panel(lines: list[str]) -> str:
+    for line in lines:
+        if line.startswith("Score:"):
+            return line
+    return "Score: 0"
 
 
 def _split_move_line(line: str) -> tuple[str, str]:
