@@ -3,6 +3,7 @@ import pytest
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.piece import Piece
 from kongfu_chess.errors import (
+    DuplicatePieceIdError,
     EmptyBoardError,
     RowWidthMismatchError,
     UnknownTokenError,
@@ -149,12 +150,46 @@ def test_place_piece_on_occupied_cell_raises_duplicate_occupancy():
 
 
 def test_place_piece_with_duplicate_id_raises():
-    from kongfu_chess.errors import DuplicatePieceIdError
-
     board = Board([["wK", "."]])
     duplicate = Piece.from_token("bK", piece_id=board.get_cell(0, 0).piece_id)
     with pytest.raises(DuplicatePieceIdError):
         board.place_piece(0, 1, duplicate)
+
+
+def test_clearing_piece_does_not_release_its_id_for_a_different_piece():
+    board = Board([["wK", "."]])
+    original = board.get_cell(0, 0)
+    board.clear_cell(0, 0)
+    duplicate = Piece.from_token("bK", piece_id=original.piece_id)
+
+    with pytest.raises(DuplicatePieceIdError):
+        board.place_piece(0, 1, duplicate)
+
+
+def test_restore_piece_reactivates_the_same_temporarily_removed_object():
+    board = Board([["wK", "."]])
+    original = board.get_cell(0, 0)
+    board.clear_cell(0, 0)
+
+    board.restore_piece(0, 1, original)
+
+    assert board.get_cell(0, 1) is original
+
+
+def test_place_piece_assigns_id_when_new_piece_has_none():
+    board = Board([["wK", "."]])
+    board.place_piece(0, 1, Piece.from_token("bK"))
+
+    assert board.get_cell(0, 1).piece_id == 1
+
+
+def test_capture_does_not_release_captured_id_for_reuse():
+    board = Board([["wK", "bQ", "."]])
+    captured_id = board.get_cell(0, 1).piece_id
+    board.move_piece(0, 0, 0, 1)
+
+    with pytest.raises(DuplicatePieceIdError):
+        board.place_piece(0, 2, Piece.from_token("bR", piece_id=captured_id))
 
 
 def test_move_piece_preserves_piece_id():

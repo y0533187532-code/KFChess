@@ -18,6 +18,8 @@ class BoardPort(Protocol):
 
     def place_piece(self, row: int, col: int, piece: Any) -> None: ...
 
+    def restore_piece(self, row: int, col: int, piece: Any) -> None: ...
+
 
 class RuleEnginePort(Protocol):
     @property

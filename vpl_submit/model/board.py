@@ -4,22 +4,22 @@ try:
     from ..config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
     from ..errors import (
         DuplicateOccupancyError,
-        DuplicatePieceIdError,
         EmptyBoardError,
         RowWidthMismatchError,
         UnknownTokenError,
     )
     from .piece import Piece
+    from .piece_registry import PieceRegistry
 except ImportError:
     from config import EMPTY_CELL_TOKEN, DEFAULT_VALID_COLORS, DEFAULT_VALID_PIECE_TYPES
     from errors import (
         DuplicateOccupancyError,
-        DuplicatePieceIdError,
         EmptyBoardError,
         RowWidthMismatchError,
         UnknownTokenError,
     )
     from piece import Piece
+    from piece_registry import PieceRegistry
 
 
 class Board:
@@ -28,11 +28,13 @@ class Board:
         rows_of_tokens,
         valid_colors=DEFAULT_VALID_COLORS,
         valid_piece_types=DEFAULT_VALID_PIECE_TYPES,
+        piece_registry=None,
     ):
         self._valid_colors = valid_colors
         self._valid_piece_types = valid_piece_types
-        self._next_piece_id = 0
-        self._piece_ids = set()
+        self._piece_registry = (
+            PieceRegistry() if piece_registry is None else piece_registry
+        )
         self._cells = self._build_cells(rows_of_tokens)
 
     def _build_cells(self, rows_of_tokens):
@@ -51,30 +53,31 @@ class Board:
         if token == EMPTY_CELL_TOKEN:
             return None
 
-        piece = Piece.from_token(token, piece_id=self._next_piece_id)
-        self._next_piece_id += 1
+        piece = Piece.from_token(token)
         if piece is None or not piece.is_valid(self._valid_colors, self._valid_piece_types):
             raise UnknownTokenError(token)
-        self._register_piece_id(piece.piece_id)
-        return piece
-
-    def _register_piece_id(self, piece_id):
-        if piece_id in self._piece_ids:
-            raise DuplicatePieceIdError(piece_id)
-        self._piece_ids.add(piece_id)
+        return self._piece_registry.register(piece)
 
     def place_piece(self, row, col, piece):
         """Place ``piece`` at ``(row, col)`` if the cell is empty.
 
         Raises DuplicateOccupancyError when the cell is occupied and
-        DuplicatePieceIdError when ``piece.piece_id`` is already on the board.
+        DuplicatePieceIdError when ``piece.piece_id`` was already registered
+        during this game's lifetime.
         """
         if not self.in_bounds(row, col):
             raise IndexError(f"Cell ({row}, {col}) is out of bounds")
         if self._cells[row][col] is not None:
             raise DuplicateOccupancyError(row, col)
-        if piece.piece_id is not None:
-            self._register_piece_id(piece.piece_id)
+        self._cells[row][col] = self._piece_registry.register(piece)
+
+    def restore_piece(self, row, col, piece):
+        """Return the same known piece to an empty cell after temporary removal."""
+        if not self.in_bounds(row, col):
+            raise IndexError(f"Cell ({row}, {col}) is out of bounds")
+        if self._cells[row][col] is not None:
+            raise DuplicateOccupancyError(row, col)
+        self._piece_registry.reactivate(piece)
         self._cells[row][col] = piece
 
     @property
@@ -92,8 +95,8 @@ class Board:
     def clear_cell(self, row, col):
         """Remove whatever occupies (row, col), leaving the cell empty."""
         piece = self._cells[row][col]
-        if piece is not None and piece.piece_id is not None:
-            self._piece_ids.discard(piece.piece_id)
+        if piece is not None:
+            self._piece_registry.deactivate(piece)
         self._cells[row][col] = None
 
     def in_bounds(self, row, col):
@@ -101,10 +104,16 @@ class Board:
 
     def move_piece(self, from_row, from_col, to_row, to_col, promotion_piece_type=None):
         piece = self._cells[from_row][from_col]
+        captured_piece = self._cells[to_row][to_col]
+        if captured_piece is not None and captured_piece is not piece:
+            self._piece_registry.deactivate(captured_piece)
         if promotion_piece_type is not None:
-            piece = piece.with_piece_type(promotion_piece_type)
+            promoted_piece = piece.with_piece_type(promotion_piece_type)
+            self._piece_registry.replace_piece(piece, promoted_piece)
+            piece = promoted_piece
         self._cells[to_row][to_col] = piece
-        self._cells[from_row][from_col] = None
+        if (from_row, from_col) != (to_row, to_col):
+            self._cells[from_row][from_col] = None
 
     def render_rows(self):
         rows = []

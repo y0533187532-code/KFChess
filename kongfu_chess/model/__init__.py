@@ -4,6 +4,7 @@ from .game_state import GameState
 from .events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
 from .move_history import MoveHistory
 from .piece import Piece
+from .piece_registry import PieceRegistry
 from .piece_state import (
     PIECE_STATE_CAPTURED,
     PIECE_STATE_IDLE,
@@ -23,6 +24,7 @@ __all__ = [
     "MoveHistory",
     "PieceCapturedEvent",
     "Piece",
+    "PieceRegistry",
     "PieceState",
     "PIECE_STATE_CAPTURED",
     "PIECE_STATE_IDLE",

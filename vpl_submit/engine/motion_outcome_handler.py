@@ -125,7 +125,7 @@ class MotionOutcomeHandler:
             )
             self._board.clear_cell(row, col)
 
-        self._board.place_piece(row, col, jumper)
+        self._board.restore_piece(row, col, jumper)
         self._start_rest_for_piece_at(row, col)
         self._publish_completed_jump(jumper, row, col)
         self._publish_if_present(capture_event)

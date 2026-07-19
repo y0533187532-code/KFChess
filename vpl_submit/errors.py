@@ -67,6 +67,14 @@ class DuplicatePieceIdError(BoardParsingError):
         super().__init__(f"Duplicate piece id: {piece_id}")
 
 
+class UnknownPieceIdError(BoardParsingError):
+    code = ErrorCode.UNKNOWN_PIECE_ID
+
+    def __init__(self, piece_id):
+        self.piece_id = piece_id
+        super().__init__(f"Unknown piece id: {piece_id}")
+
+
 class InvalidPromotionTypeError(Exception):
     code = ErrorCode.INVALID_PROMOTION_TYPE
 
