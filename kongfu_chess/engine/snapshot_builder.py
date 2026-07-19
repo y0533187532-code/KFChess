@@ -105,12 +105,12 @@ class SnapshotBuilder:
             )
 
     def _captured_piece_snapshots(self):
-        for piece, row, col in self._state.captured_pieces:
+        for captured_piece in self._state.captured_pieces:
             yield PieceSnapshot(
-                row=row,
-                col=col,
-                token=piece.token,
-                piece_id=piece.piece_id,
+                row=captured_piece.row,
+                col=captured_piece.col,
+                token=captured_piece.token,
+                piece_id=captured_piece.piece_id,
                 state=PIECE_STATE_CAPTURED,
             )
 

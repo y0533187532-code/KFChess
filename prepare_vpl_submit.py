@@ -130,6 +130,7 @@ def main():
     for name in (
         "__init__.py",
         "board.py",
+        "captured_piece.py",
         "events.py",
         "game_state.py",
         "move_history.py",

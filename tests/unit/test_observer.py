@@ -90,6 +90,6 @@ def test_king_capture_publishes_game_over_after_state_is_marked():
     assert subscriber.events == [
         GameOverEvent(
             winning_color="w",
-            captured_piece_id=game.state.captured_pieces[-1][0].piece_id,
+            captured_piece_id=game.state.captured_pieces[-1].piece_id,
         )
     ]

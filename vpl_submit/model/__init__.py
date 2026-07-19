@@ -1,4 +1,5 @@
 from .board import Board
+from .captured_piece import CapturedPiece
 from .game_state import GameState
 from .events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
 from .move_history import MoveHistory
@@ -12,6 +13,7 @@ from .position import Position
 
 __all__ = [
     "Board",
+    "CapturedPiece",
     "GameState",
     "GameOverEvent",
     "MoveCompletedEvent",

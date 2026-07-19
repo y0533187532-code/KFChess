@@ -1,4 +1,9 @@
+from dataclasses import FrozenInstanceError
+
+import pytest
+
 from kongfu_chess.model.board import Board
+from kongfu_chess.model.captured_piece import CapturedPiece
 from kongfu_chess.model.game_state import GameState
 from kongfu_chess.model.piece import Piece
 
@@ -44,3 +49,22 @@ def test_game_state_add_score_accumulates_points():
     state.add_score("w", 5)
     state.add_score("b", 1)
     assert state.score_by_color == {"w": 8, "b": 1}
+
+
+def test_record_capture_stores_an_immutable_piece_snapshot():
+    board = Board([["wK", "bP"]])
+    state = GameState(board=board)
+    captured_piece = board.get_cell(0, 1)
+
+    state.record_capture(captured_piece, 0, 1)
+
+    capture = state.captured_pieces[0]
+    assert capture == CapturedPiece(
+        piece_id=captured_piece.piece_id,
+        token="bP",
+        row=0,
+        col=1,
+    )
+    assert capture.position == (0, 1)
+    with pytest.raises(FrozenInstanceError):
+        capture.row = 2

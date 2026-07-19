@@ -6,10 +6,12 @@ from types import MappingProxyType
 
 try:
     from ..config import BLACK_COLOR, WHITE_COLOR
+    from .captured_piece import CapturedPiece
     from .events import MoveCompletedEvent
     from .move_history import MoveHistory
 except ImportError:
     from config import BLACK_COLOR, WHITE_COLOR
+    from model.captured_piece import CapturedPiece
     from model.events import MoveCompletedEvent
     from model.move_history import MoveHistory
 
@@ -22,7 +24,7 @@ class GameState:
         self._game_over = False
         self._selected: tuple[int, int] | None = None
         self._promotion_choice: str | None = None
-        self._captured_pieces = []
+        self._captured_pieces: list[CapturedPiece] = []
         self._score_by_color = {WHITE_COLOR: 0, BLACK_COLOR: 0}
         self._move_history = move_history or MoveHistory()
 
@@ -43,7 +45,7 @@ class GameState:
         return self._promotion_choice
 
     @property
-    def captured_pieces(self) -> tuple:
+    def captured_pieces(self) -> tuple[CapturedPiece, ...]:
         return tuple(self._captured_pieces)
 
     @property
@@ -80,7 +82,14 @@ class GameState:
         self._selected = (row, col)
 
     def record_capture(self, piece, row: int, col: int) -> None:
-        self._captured_pieces.append((piece, row, col))
+        self._captured_pieces.append(
+            CapturedPiece(
+                piece_id=piece.piece_id,
+                token=piece.token,
+                row=row,
+                col=col,
+            )
+        )
 
     def add_score(self, color: str, points: int) -> None:
         self._score_by_color[color] = self._score_by_color.get(color, 0) + points

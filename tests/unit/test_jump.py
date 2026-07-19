@@ -163,7 +163,7 @@ def test_enemy_diagonal_arrival_captures_airborne_jumper_and_logs_actual_resolut
     assert board.get_cell(0, 0).token == "bB"
     assert board.get_cell(0, 0).piece_id == black_piece_id
     assert board.get_cell(1, 1) is None
-    assert any(piece.piece_id == white_piece_id for piece, _, _ in state.captured_pieces)
+    assert any(piece.piece_id == white_piece_id for piece in state.captured_pieces)
     assert not any(is_jump_motion(move) and move["from"] == (0, 0) for move in engine.active_moves)
     assert engine.snapshot().score_by_color == {"w": 0, "b": 0}
 
@@ -196,7 +196,7 @@ def test_jumper_lands_after_enemy_arrival_and_captures_enemy():
     assert board.get_cell(0, 0).token == "wK"
     assert board.get_cell(0, 0).piece_id == white_piece_id
     assert board.get_cell(1, 1) is None
-    assert any(piece.piece_id == black_piece_id for piece, _, _ in state.captured_pieces)
+    assert any(piece.piece_id == black_piece_id for piece in state.captured_pieces)
     assert engine.snapshot().score_by_color == {"w": 3, "b": 0}
 
 
