@@ -13,7 +13,7 @@ from kongfu_chess.view.renderer import Renderer
 
 def test_design_guide_timing_and_pixel_constants():
     assert CELL_SIZE_PX == 100
-    assert all(duration == 500 for duration in DEFAULT_MOVE_DURATION_MS.values())
+    assert all(duration == 1000 for duration in DEFAULT_MOVE_DURATION_MS.values())
 
 
 def test_rule_engine_validate_move_is_read_only():

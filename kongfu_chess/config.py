@@ -89,7 +89,7 @@ DEFAULT_JUMP_DURATION_MS = 500
 
 # --- Real-time move travel durations (milliseconds per piece type) ---
 # Injectable via Game(move_durations=...) for custom games.
-DEFAULT_MOVE_DURATION_MS = dict.fromkeys(DEFAULT_VALID_PIECE_TYPES, 500)
+DEFAULT_MOVE_DURATION_MS = dict.fromkeys(DEFAULT_VALID_PIECE_TYPES, 1000)
 
 # --- Post-move rest durations (milliseconds per piece type) ---
 # After a piece finishes an accepted travel move, it must rest before it can

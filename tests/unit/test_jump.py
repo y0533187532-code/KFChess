@@ -28,10 +28,10 @@ def make_game(rows):
     return board, Game(board)
 
 
-def make_engine(rows):
+def make_engine(rows, **engine_options):
     board = Board(rows)
     state = GameState(board=board)
-    engine = GameEngine(board, state, RuleEngine())
+    engine = GameEngine(board, state, RuleEngine(), **engine_options)
     return board, state, engine
 
 
@@ -136,7 +136,10 @@ def test_jump_landing_records_completed_move():
 
 
 def test_enemy_arriving_at_airborne_origin_captures_jumper():
-    board, _, engine = make_engine([["wK", "bR", "."]])
+    board, _, engine = make_engine(
+        [["wK", "bR", "."]],
+        move_durations={"R": DEFAULT_JUMP_DURATION_MS},
+    )
     engine.request_jump(0, 0)
     engine.request_move(0, 1, 0, 0)
     finish_jump(engine)
@@ -150,7 +153,8 @@ def test_enemy_diagonal_arrival_captures_airborne_jumper_and_logs_actual_resolut
             ["wK", ".", "."],
             [".", "bB", "."],
             [".", ".", "."],
-        ]
+        ],
+        move_durations={"B": DEFAULT_JUMP_DURATION_MS},
     )
     white_piece_id = board.get_cell(0, 0).piece_id
     black_piece_id = board.get_cell(1, 1).piece_id
@@ -180,7 +184,8 @@ def test_jumper_lands_after_enemy_arrival_and_captures_enemy():
         [
             ["wK", "."],
             [".", "bB"],
-        ]
+        ],
+        move_durations={"B": DEFAULT_JUMP_DURATION_MS},
     )
     white_piece_id = board.get_cell(0, 0).piece_id
     black_piece_id = board.get_cell(1, 1).piece_id
@@ -208,7 +213,13 @@ def test_snapshot_keeps_airborne_jumper_visible_above_enemy_on_same_cell():
         ]
     )
     state = GameState(board=board)
-    engine = GameEngine(board, state, RuleEngine(), jump_duration_ms=2000)
+    engine = GameEngine(
+        board,
+        state,
+        RuleEngine(),
+        jump_duration_ms=2000,
+        move_durations={"B": DEFAULT_JUMP_DURATION_MS},
+    )
     white_piece_id = board.get_cell(0, 0).piece_id
     black_piece_id = board.get_cell(1, 1).piece_id
 

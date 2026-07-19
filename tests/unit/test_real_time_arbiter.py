@@ -54,10 +54,10 @@ def test_piece_arrives_after_full_duration():
 def test_partial_waits_accumulate_to_arrival():
     board, _, engine = make_engine([["wK", "."]])
     engine.request_move(0, 0, 0, 1)
-    engine.wait(200)
-    engine.wait(150)
+    engine.wait(KING_MOVE_MS // 4)
+    engine.wait(KING_MOVE_MS // 4)
     assert board.get_cell(0, 0).token == "wK"
-    engine.wait(150)
+    engine.wait(KING_MOVE_MS // 2)
     assert board.get_cell(0, 1).token == "wK"
 
 
