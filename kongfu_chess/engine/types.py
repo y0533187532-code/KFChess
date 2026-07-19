@@ -7,9 +7,9 @@ from types import MappingProxyType
 from typing import Mapping
 
 try:
-    from ..model.piece import PIECE_STATE_IDLE
+    from ..model.piece_state import PieceState
 except ImportError:
-    from model.piece import PIECE_STATE_IDLE
+    from model.piece_state import PieceState
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class PieceSnapshot:
     col: int
     token: str
     piece_id: int
-    state: str = PIECE_STATE_IDLE
+    state: PieceState = PieceState.IDLE
     rest_remaining_ms: int | None = None
 
 

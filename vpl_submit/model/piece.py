@@ -1,6 +1,6 @@
-"""A single chess piece.
+"""The stable identity and intrinsic attributes of a chess piece.
 
-A Piece only knows its own color and type code. It has no idea how (or
+A Piece only knows its own identifier, color, and type code. It has no idea how (or
 whether) a Board stores it internally - that is the Board's business, not
 its own (encapsulation).
 
@@ -19,18 +19,31 @@ try:
 except ImportError:
     from config import TOKEN_LENGTH
 
-PIECE_STATE_IDLE = "idle"
-PIECE_STATE_MOVING = "moving"
-PIECE_STATE_JUMPING = "jump"
-PIECE_STATE_RESTING = "resting"
-PIECE_STATE_CAPTURED = "captured"
+# Compatibility re-exports for callers that imported lifecycle constants from
+# this module before state ownership moved to ``piece_state``.
+try:
+    from .piece_state import (
+        PIECE_STATE_CAPTURED,
+        PIECE_STATE_IDLE,
+        PIECE_STATE_JUMPING,
+        PIECE_STATE_MOVING,
+        PIECE_STATE_RESTING,
+    )
+except ImportError:
+    from piece_state import (
+        PIECE_STATE_CAPTURED,
+        PIECE_STATE_IDLE,
+        PIECE_STATE_JUMPING,
+        PIECE_STATE_MOVING,
+        PIECE_STATE_RESTING,
+    )
+
 
 @dataclass(frozen=True)
 class Piece:
     color: str
     piece_type: str
     piece_id: int | None = None
-    state: str = PIECE_STATE_IDLE
 
     def is_valid(self, valid_colors, valid_piece_types):
         """Check this piece against a caller-supplied rule-set."""
@@ -42,7 +55,7 @@ class Piece:
         return f"{self.color}{self.piece_type}"
 
     @classmethod
-    def from_token(cls, token, piece_id=None, state=PIECE_STATE_IDLE):
+    def from_token(cls, token, piece_id=None):
         """Build a Piece from a token such as ``"wP"``."""
         if len(token) != TOKEN_LENGTH:
             return None
@@ -51,16 +64,6 @@ class Piece:
             color=color,
             piece_type=piece_type,
             piece_id=piece_id,
-            state=state,
-        )
-
-    def with_state(self, state):
-        """Return a copy of this piece with an updated lifecycle state."""
-        return Piece(
-            color=self.color,
-            piece_type=self.piece_type,
-            piece_id=self.piece_id,
-            state=state,
         )
 
     def with_piece_type(self, piece_type):
@@ -69,5 +72,4 @@ class Piece:
             color=self.color,
             piece_type=piece_type,
             piece_id=self.piece_id,
-            state=self.state,
         )

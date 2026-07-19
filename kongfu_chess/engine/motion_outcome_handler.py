@@ -2,14 +2,12 @@
 
 try:
     from ..model.events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
-    from ..model.piece import PIECE_STATE_CAPTURED
     from ..realtime.arrival_resolver import apply_arrival
     from ..realtime.collision import clear_motion_transit
     from ..rules import resolve_promotion_piece_type
     from .reasons import CompletionReason
 except ImportError:
     from model.events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
-    from model.piece import PIECE_STATE_CAPTURED
     from realtime.arrival_resolver import apply_arrival
     from realtime.collision import clear_motion_transit
     from rules import resolve_promotion_piece_type
@@ -115,7 +113,7 @@ class MotionOutcomeHandler:
 
         capture_event = None
         if occupant is not None:
-            captured = occupant.with_state(PIECE_STATE_CAPTURED)
+            captured = occupant
             points_awarded = self._capture_service.record(
                 captured, (row, col), jumper.color
             )
@@ -140,9 +138,7 @@ class MotionOutcomeHandler:
             if captured_at is not None:
                 cap_row, cap_col = captured_at
                 self._arbiter.clear_rest(piece.piece_id)
-                self._state.record_capture(
-                    piece.with_state(PIECE_STATE_CAPTURED), cap_row, cap_col
-                )
+                self._state.record_capture(piece, cap_row, cap_col)
             self._board.clear_cell(from_row, from_col)
         self._arbiter.remove_motion(motion)
 

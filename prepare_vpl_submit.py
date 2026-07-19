@@ -15,6 +15,7 @@ FLAT_FILES = [
     ("config.py", PKG / "config.py"),
     ("errors.py", PKG / "errors.py"),
     ("piece.py", PKG / "model" / "piece.py"),
+    ("piece_state.py", PKG / "model" / "piece_state.py"),
     ("board.py", PKG / "model" / "board.py"),
     ("commands.py", PKG / "texttests" / "script_runner.py"),
     ("game.py", PKG / "game.py"),
@@ -135,6 +136,7 @@ def main():
         "game_state.py",
         "move_history.py",
         "piece.py",
+        "piece_state.py",
         "position.py",
     ):
         shutil.copy2(PKG / "model" / name, model_out / name)

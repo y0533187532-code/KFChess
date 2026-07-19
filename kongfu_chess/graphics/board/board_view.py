@@ -1,8 +1,8 @@
 """Board and piece rendering helpers built on top of the supplied Img class."""
 
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 from kongfu_chess.config import CELL_SIZE_PX
 from kongfu_chess.engine.types import GameSnapshot
+from kongfu_chess.model.piece_state import PieceState
 
 from ..core.img import Img
 from .board_assets import ASSETS_PATH, BOARD_PATH, PIECES_PATH, load_board, load_piece
@@ -55,7 +55,7 @@ def render_snapshot(snapshot: GameSnapshot) -> Img:
     board = load_board()
 
     for piece in snapshot.pieces:
-        if piece.state == PIECE_STATE_CAPTURED:
+        if piece.state == PieceState.CAPTURED:
             continue
         draw_piece(
             board,

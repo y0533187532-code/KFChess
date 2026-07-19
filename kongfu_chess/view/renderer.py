@@ -2,7 +2,7 @@
 
 from ..config import CELL_SIZE_PX, EMPTY_CELL_TOKEN
 from ..engine.types import GameSnapshot
-from ..model.piece import PIECE_STATE_CAPTURED
+from ..model.piece_state import PieceState
 
 
 class Renderer:
@@ -15,7 +15,7 @@ class Renderer:
             for _ in range(snapshot.board_height)
         ]
         for piece in snapshot.pieces:
-            if getattr(piece, "state", "idle") == PIECE_STATE_CAPTURED:
+            if getattr(piece, "state", PieceState.IDLE) == PieceState.CAPTURED:
                 continue
             grid[piece.row][piece.col] = piece.token
         return [" ".join(row) for row in grid]

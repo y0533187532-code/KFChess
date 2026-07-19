@@ -40,17 +40,10 @@ def test_token_reconstructs_canonical_two_character_form():
     assert piece.token == "wP"
 
 
-def test_piece_defaults_to_idle_state():
+def test_piece_contains_identity_data_without_runtime_state():
     piece = Piece.from_token("wP")
-    assert piece.state == "idle"
-
-
-def test_with_state_returns_new_piece_with_updated_state():
-    piece = Piece.from_token("wP", piece_id=1)
-    moving = piece.with_state("moving")
-    assert moving.state == "moving"
-    assert moving.piece_id == 1
-    assert piece.state == "idle"
+    assert not hasattr(piece, "state")
+    assert not hasattr(piece, "with_state")
 
 
 def test_with_piece_type_preserves_piece_id():

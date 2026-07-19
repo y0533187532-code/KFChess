@@ -4,7 +4,6 @@ from kongfu_chess.engine.game_engine import GameEngine
 from kongfu_chess.engine.types import MoveResult
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.game_state import GameState
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
 from kongfu_chess.realtime.arrival_resolver import apply_arrival
 from kongfu_chess.rules import RuleEngine
 
@@ -18,11 +17,13 @@ def make_engine(rows):
 
 def test_apply_arrival_removes_captured_enemy_from_board():
     board = Board([["wR", "bQ"]])
+    captured_piece = board.get_cell(0, 1)
     result = apply_arrival(board, 0, 0, 0, 1, "w")
     assert board.get_cell(0, 1).token == "wR"
     assert board.get_cell(0, 0) is None
     assert result.captured_piece.token == "bQ"
-    assert result.captured_piece.state == PIECE_STATE_CAPTURED
+    assert result.captured_piece is captured_piece
+    assert not hasattr(result.captured_piece, "state")
     assert result.king_captured is False
 
 

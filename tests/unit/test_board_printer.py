@@ -5,7 +5,7 @@ from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
 from kongfu_chess.game import Game
 from kongfu_chess.io.board_printer import BoardPrinter
 from kongfu_chess.model.board import Board
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
+from kongfu_chess.model.piece_state import PieceState
 
 
 def test_render_rows_matches_board_render_rows():
@@ -40,7 +40,7 @@ def test_render_rows_from_snapshot_omits_captured_pieces():
         game_over=False,
         pieces=(
             PieceSnapshot(row=0, col=0, token="wR", piece_id=0, state="idle"),
-            PieceSnapshot(row=0, col=1, token="bQ", piece_id=1, state=PIECE_STATE_CAPTURED),
+            PieceSnapshot(row=0, col=1, token="bQ", piece_id=1, state=PieceState.CAPTURED),
         ),
     )
     assert BoardPrinter().render_rows(snapshot) == ["wR ."]

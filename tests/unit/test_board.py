@@ -97,9 +97,10 @@ def test_in_bounds_false_outside_the_grid():
 
 def test_move_piece_relocates_piece_and_empties_source_cell():
     board = Board([["wK", "."], [".", "bK"]])
+    piece = board.get_cell(0, 0)
     board.move_piece(0, 0, 0, 1)
     assert board.get_cell(0, 0) is None
-    assert board.get_cell(0, 1).token == "wK"
+    assert board.get_cell(0, 1) is piece
 
 
 def test_move_piece_onto_occupied_cell_captures_it():

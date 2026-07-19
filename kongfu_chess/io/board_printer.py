@@ -2,10 +2,10 @@
 
 try:
     from ..config import EMPTY_CELL_TOKEN
-    from ..model.piece import PIECE_STATE_CAPTURED
+    from ..model.piece_state import PieceState
 except ImportError:
     from config import EMPTY_CELL_TOKEN
-    from model.piece import PIECE_STATE_CAPTURED
+    from model.piece_state import PieceState
 
 
 class BoardPrinter:
@@ -25,7 +25,7 @@ class BoardPrinter:
             for _ in range(snapshot.board_height)
         ]
         for piece in snapshot.pieces:
-            if getattr(piece, "state", "idle") == PIECE_STATE_CAPTURED:
+            if getattr(piece, "state", PieceState.IDLE) == PieceState.CAPTURED:
                 continue
             grid[piece.row][piece.col] = piece.token
         return [" ".join(row) for row in grid]

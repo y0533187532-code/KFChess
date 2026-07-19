@@ -5,12 +5,7 @@ from kongfu_chess.engine.types import MoveResult, PieceSnapshot
 from kongfu_chess.config import DEFAULT_MOVE_DURATION_MS, DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
 from kongfu_chess.model.board import Board
 from kongfu_chess.model.game_state import GameState
-from kongfu_chess.model.piece import (
-    PIECE_STATE_CAPTURED,
-    PIECE_STATE_IDLE,
-    PIECE_STATE_MOVING,
-    PIECE_STATE_RESTING,
-)
+from kongfu_chess.model.piece_state import PieceState
 from kongfu_chess.rules import RuleEngine
 
 
@@ -74,7 +69,7 @@ def test_snapshot_exposes_read_only_game_state():
             col=0,
             token="wK",
             piece_id=board.get_cell(0, 0).piece_id,
-            state=PIECE_STATE_IDLE,
+            state=PieceState.IDLE,
             rest_remaining_ms=None,
         ),
     )
@@ -114,11 +109,11 @@ def test_snapshot_derives_moving_state_from_active_motions_without_mutating_boar
     engine.request_move(0, 0, 0, 1)
 
     assert board.get_cell(0, 0).token == "wK"
-    assert board.get_cell(0, 0).state == PIECE_STATE_IDLE
+    assert board.get_cell(0, 0) is piece
 
     snapshot = engine.snapshot()
     moving = next(item for item in snapshot.pieces if item.piece_id == piece_id)
-    assert moving.state == PIECE_STATE_MOVING
+    assert moving.state == PieceState.MOVING
     assert moving.rest_remaining_ms is None
     assert moving.row == 0 and moving.col == 0
 
@@ -131,10 +126,10 @@ def test_snapshot_returns_mover_to_idle_after_arrival():
 
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
-    assert arrived.state == PIECE_STATE_RESTING
+    assert arrived.state == PieceState.RESTING
     assert arrived.rest_remaining_ms == KING_REST_MS
     assert arrived.row == 0 and arrived.col == 1
-    assert board.get_cell(0, 1).state == PIECE_STATE_IDLE
+    assert not hasattr(board.get_cell(0, 1), "state")
 
 
 def test_snapshot_marks_captured_victim_after_arrival():
@@ -143,13 +138,13 @@ def test_snapshot_marks_captured_victim_after_arrival():
     victim_id = board.get_cell(0, 1).piece_id
 
     assert next(p for p in engine.snapshot().pieces if p.piece_id == victim_id).state == (
-        PIECE_STATE_IDLE
+        PieceState.IDLE
     )
 
     engine.request_move(0, 0, 0, 1)
     mid = engine.snapshot()
-    assert next(p for p in mid.pieces if p.piece_id == attacker_id).state == PIECE_STATE_MOVING
-    assert next(p for p in mid.pieces if p.piece_id == victim_id).state == PIECE_STATE_IDLE
+    assert next(p for p in mid.pieces if p.piece_id == attacker_id).state == PieceState.MOVING
+    assert next(p for p in mid.pieces if p.piece_id == victim_id).state == PieceState.IDLE
     assert board.get_cell(0, 1).token == "bQ"
 
     engine.wait(1000)
@@ -158,11 +153,11 @@ def test_snapshot_marks_captured_victim_after_arrival():
     assert board.get_cell(0, 0) is None
     assert len(state.captured_pieces) == 1
     captured = next(p for p in after.pieces if p.piece_id == victim_id)
-    assert captured.state == PIECE_STATE_CAPTURED
+    assert captured.state == PieceState.CAPTURED
     assert captured.rest_remaining_ms is None
     assert captured.row == 0 and captured.col == 1
     attacker = next(p for p in after.pieces if p.piece_id == attacker_id)
-    assert attacker.state == PIECE_STATE_RESTING
+    assert attacker.state == PieceState.RESTING
     assert attacker.rest_remaining_ms == KING_REST_MS
 
 
@@ -239,7 +234,7 @@ def test_snapshot_returns_idle_after_rest_expires():
     engine.wait(KING_REST_MS)
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
-    assert arrived.state == PIECE_STATE_IDLE
+    assert arrived.state == PieceState.IDLE
     assert arrived.rest_remaining_ms is None
 
 
@@ -251,7 +246,7 @@ def test_snapshot_returns_partial_rest_remaining_ms():
     engine.wait(500)
     snapshot = engine.snapshot()
     arrived = next(item for item in snapshot.pieces if item.piece_id == piece_id)
-    assert arrived.state == PIECE_STATE_RESTING
+    assert arrived.state == PieceState.RESTING
     assert arrived.rest_remaining_ms == KING_REST_MS - 500
 
 

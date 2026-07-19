@@ -17,7 +17,7 @@ from kongfu_chess.graphics.board_view import (
 )
 from kongfu_chess.graphics.img import Img
 from kongfu_chess.engine.types import GameSnapshot, PieceSnapshot
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
+from kongfu_chess.model.piece_state import PieceState
 
 
 def test_board_asset_exists():
@@ -106,7 +106,7 @@ def test_render_snapshot_skips_captured_pieces():
                 col=4,
                 token="wK",
                 piece_id=1,
-                state=PIECE_STATE_CAPTURED,
+                state=PieceState.CAPTURED,
             ),
         ),
     )

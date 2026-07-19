@@ -3,20 +3,10 @@
 from __future__ import annotations
 
 try:
-    from ..model.piece import (
-        PIECE_STATE_CAPTURED,
-        PIECE_STATE_JUMPING,
-        PIECE_STATE_MOVING,
-        PIECE_STATE_RESTING,
-    )
+    from ..model.piece_state import PieceState
     from .types import GameSnapshot, MoveEventSnapshot, PieceSnapshot
 except ImportError:
-    from model.piece import (
-        PIECE_STATE_CAPTURED,
-        PIECE_STATE_JUMPING,
-        PIECE_STATE_MOVING,
-        PIECE_STATE_RESTING,
-    )
+    from model.piece_state import PieceState
     from engine.types import GameSnapshot, MoveEventSnapshot, PieceSnapshot
 
 
@@ -72,12 +62,12 @@ class SnapshotBuilder:
         motion = self._active_motion_from(row, col, piece.piece_id)
         rest_remaining_ms = self._arbiter.rest_remaining_ms(piece.piece_id)
         if motion is not None:
-            state = PIECE_STATE_JUMPING if motion.get("jump") else PIECE_STATE_MOVING
+            state = PieceState.JUMPING if motion.get("jump") else PieceState.MOVING
             rest_remaining_ms = None
         elif rest_remaining_ms is not None:
-            state = PIECE_STATE_RESTING
+            state = PieceState.RESTING
         else:
-            state = piece.state
+            state = PieceState.IDLE
         if (row, col) in moving_origins:
             rest_remaining_ms = None
         return PieceSnapshot(
@@ -100,7 +90,7 @@ class SnapshotBuilder:
                 col=col,
                 token=jump_piece.token,
                 piece_id=jump_piece.piece_id,
-                state=PIECE_STATE_JUMPING,
+                state=PieceState.JUMPING,
                 rest_remaining_ms=None,
             )
 
@@ -111,7 +101,7 @@ class SnapshotBuilder:
                 col=captured_piece.col,
                 token=captured_piece.token,
                 piece_id=captured_piece.piece_id,
-                state=PIECE_STATE_CAPTURED,
+                state=PieceState.CAPTURED,
             )
 
     def _active_motion_from(self, row, col, piece_id):

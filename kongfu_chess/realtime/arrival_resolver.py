@@ -6,10 +6,8 @@ from dataclasses import dataclass
 
 try:
     from ..config import KING_PIECE_TYPE
-    from ..model.piece import PIECE_STATE_CAPTURED
 except ImportError:
     from config import KING_PIECE_TYPE
-    from model.piece import PIECE_STATE_CAPTURED
 
 
 @dataclass(frozen=True)
@@ -40,13 +38,9 @@ def apply_arrival(
         promotion_piece_type=promotion_piece_type,
     )
 
-    marked_captured = None
-    if captured is not None:
-        marked_captured = captured.with_state(PIECE_STATE_CAPTURED)
-
     king_captured = (
         captured is not None
         and captured.piece_type == game_over_piece_type
         and captured.color != moving_color
     )
-    return ArrivalResult(captured_piece=marked_captured, king_captured=king_captured)
+    return ArrivalResult(captured_piece=captured, king_captured=king_captured)

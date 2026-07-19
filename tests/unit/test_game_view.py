@@ -4,7 +4,7 @@ from kongfu_chess.graphics.game_view import GameView
 from kongfu_chess.graphics.img import Img
 from kongfu_chess.graphics.piece_animator import PieceAnimator
 from kongfu_chess.graphics.screen_layout import BOARD_X_PX, BOARD_Y_PX
-from kongfu_chess.model.piece import PIECE_STATE_CAPTURED
+from kongfu_chess.model.piece_state import PieceState
 
 
 def test_render_returns_img_board():
@@ -185,7 +185,7 @@ def test_render_skips_captured_pieces():
                 col=4,
                 token="wK",
                 piece_id=1,
-                state=PIECE_STATE_CAPTURED,
+                state=PieceState.CAPTURED,
             ),
         ),
     )

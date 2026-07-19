@@ -2,13 +2,7 @@ from types import MappingProxyType
 
 from kongfu_chess.config import DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
 from kongfu_chess.engine.types import GameSnapshot
-from kongfu_chess.model.piece import (
-    PIECE_STATE_CAPTURED,
-    PIECE_STATE_IDLE,
-    PIECE_STATE_JUMPING,
-    PIECE_STATE_MOVING,
-    PIECE_STATE_RESTING,
-)
+from kongfu_chess.model.piece_state import PieceState
 from .layout.move_log import MoveLog
 from .board.board_view import (
     draw_legal_destination,
@@ -39,13 +33,13 @@ class GameView:
     """Render the current game snapshot with animated pieces."""
 
     _STATE_TO_ASSET_STATE = {
-        PIECE_STATE_IDLE: ASSET_STATE_IDLE,
-        PIECE_STATE_MOVING: ASSET_STATE_MOVE,
+        PieceState.IDLE: ASSET_STATE_IDLE,
+        PieceState.MOVING: ASSET_STATE_MOVE,
         ASSET_STATE_MOVE: ASSET_STATE_MOVE,
-        PIECE_STATE_JUMPING: ASSET_STATE_JUMP,
-        PIECE_STATE_CAPTURED: ASSET_STATE_IDLE,
+        PieceState.JUMPING: ASSET_STATE_JUMP,
+        PieceState.CAPTURED: ASSET_STATE_IDLE,
         "selected": ASSET_STATE_IDLE,
-        PIECE_STATE_RESTING: ASSET_STATE_LONG_REST,
+        PieceState.RESTING: ASSET_STATE_LONG_REST,
         "short_rest": "short_rest",
         ASSET_STATE_LONG_REST: ASSET_STATE_LONG_REST,
     }
@@ -75,7 +69,7 @@ class GameView:
         board = load_board()
 
         for piece in snapshot.pieces:
-            if piece.state == PIECE_STATE_CAPTURED:
+            if piece.state == PieceState.CAPTURED:
                 continue
 
             current_frame = self._animation_manager.frame_for(
@@ -117,7 +111,7 @@ class GameView:
         self._frame_index += 1
         return screen
 
-    def _asset_state_for(self, state: str) -> str:
+    def _asset_state_for(self, state: PieceState | str) -> str:
         """Map logical piece states to the available asset state folders."""
         return self._STATE_TO_ASSET_STATE.get(state, ASSET_STATE_IDLE)
 
