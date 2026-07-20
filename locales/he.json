@@ -23,6 +23,8 @@
   "invalid_room_code": "קוד החדר אינו תקין.",
   "already_in_game": "כבר קיים משחק פעיל עבורך.",
   "matchmaking_timeout": "לא נמצא יריב בזמן שהוגדר.",
+  "already_in_matchmaking": "כבר הצטרפת לתור למציאת משחק.",
+  "matchmaking_queue_full": "התור למציאת משחק מלא.",
   "username_taken": "שם המשתמש כבר בשימוש.",
   "invalid_credentials": "שם המשתמש או הסיסמה שגויים.",
   "invalid_registration": "פרטי ההרשמה אינם תקינים.",

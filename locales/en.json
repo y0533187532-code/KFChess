@@ -23,6 +23,8 @@
   "invalid_room_code": "The room code is invalid.",
   "already_in_game": "You are already in a game.",
   "matchmaking_timeout": "No opponent was found in time.",
+  "already_in_matchmaking": "You are already waiting for a match.",
+  "matchmaking_queue_full": "The matchmaking queue is full.",
   "username_taken": "This username is already in use.",
   "invalid_credentials": "The username or password is incorrect.",
   "invalid_registration": "The registration details are invalid.",

@@ -28,6 +28,8 @@ class ProtocolErrorCode(str, Enum):
     INVALID_ROOM_CODE = "invalid_room_code"
     ALREADY_IN_GAME = "already_in_game"
     MATCHMAKING_TIMEOUT = "matchmaking_timeout"
+    ALREADY_IN_MATCHMAKING = "already_in_matchmaking"
+    MATCHMAKING_QUEUE_FULL = "matchmaking_queue_full"
     USERNAME_TAKEN = "username_taken"
     INVALID_CREDENTIALS = "invalid_credentials"
     INVALID_REGISTRATION = "invalid_registration"
