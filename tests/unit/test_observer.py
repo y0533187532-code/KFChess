@@ -91,5 +91,11 @@ def test_king_capture_publishes_game_over_after_state_is_marked():
         GameOverEvent(
             winning_color="w",
             captured_piece_id=game.state.captured_pieces[-1].piece_id,
+            ended_at_ms=10,
         )
     ]
+
+    game.handle_wait(100)
+
+    assert len(subscriber.events) == 1
+    assert subscriber.events[0].ended_at_ms == 10

@@ -1,0 +1,54 @@
+{
+  "network": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "protocol_version": "1.0",
+    "max_message_bytes": 65536,
+    "request_id_max_length": 128,
+    "message_type_max_length": 64,
+    "request_cache_size": 4096,
+    "initial_sequence": 0
+  },
+  "timing": {
+    "tick_interval_ms": 50,
+    "matchmaking_timeout_seconds": 60,
+    "reconnect_grace_seconds": 20,
+    "room_close_delay_seconds": 10,
+    "auth_token_ttl_seconds": 86400
+  },
+  "elo": {
+    "initial_rating": 1200,
+    "scale": 400,
+    "k_factor": 32,
+    "rating_floor": 100,
+    "matchmaking_range": 100
+  },
+  "capacity": {
+    "active_games": 50,
+    "matchmaking_users": 200,
+    "open_rooms": 100,
+    "spectators_per_room": 10,
+    "websocket_connections": 500
+  },
+  "database": {
+    "path": "../data/kfchess.sqlite3",
+    "backup_directory": "../backups",
+    "backup_interval_hours": 24,
+    "busy_timeout_ms": 5000
+  },
+  "logging": {
+    "server_path": "../logs/server.jsonl",
+    "client_path": "../logs/client.jsonl",
+    "level": "INFO",
+    "retention_days": 14,
+    "max_bytes": 104857600,
+    "backup_count": 14,
+    "debug_payloads": false
+  },
+  "security": {
+    "token_bytes": 32,
+    "username_min_length": 3,
+    "username_max_length": 20,
+    "password_min_length": 6
+  }
+}

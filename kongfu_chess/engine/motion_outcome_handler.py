@@ -78,11 +78,12 @@ class MotionOutcomeHandler:
                 points_awarded,
             )
         game_over_event = None
-        if result.king_captured:
+        if result.king_captured and not self._state.is_game_over:
             self._state.mark_game_over()
             game_over_event = GameOverEvent(
                 winning_color=move["color"],
                 captured_piece_id=result.captured_piece.piece_id,
+                ended_at_ms=self._arbiter.elapsed_ms,
             )
 
         self._publish_completed_move(
@@ -179,11 +180,12 @@ class MotionOutcomeHandler:
             king_captured=king_captured,
         )
         game_over_event = None
-        if king_captured:
+        if king_captured and not self._state.is_game_over:
             self._state.mark_game_over()
             game_over_event = GameOverEvent(
                 winning_color=piece.color,
                 captured_piece_id=occupant.piece_id,
+                ended_at_ms=self._arbiter.elapsed_ms,
             )
 
         self._publish_completed_move(

@@ -108,6 +108,7 @@ def test_airborne_king_capture_marks_game_over_and_publishes_event():
         GameOverEvent(
             winning_color="w",
             captured_piece_id=state.captured_pieces[-1].piece_id,
+            ended_at_ms=1000,
         )
     ]
 

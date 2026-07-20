@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kung-Fu Chess server configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["network", "timing", "elo", "capacity", "database", "logging", "security"],
+  "properties": {
+    "network": {"$ref": "#/$defs/network"},
+    "timing": {"$ref": "#/$defs/timing"},
+    "elo": {"$ref": "#/$defs/elo"},
+    "capacity": {"$ref": "#/$defs/capacity"},
+    "database": {"$ref": "#/$defs/database"},
+    "logging": {"$ref": "#/$defs/logging"},
+    "security": {"$ref": "#/$defs/security"}
+  },
+  "$defs": {
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "protocol_version", "max_message_bytes", "request_id_max_length", "message_type_max_length", "request_cache_size", "initial_sequence"],
+      "properties": {
+        "host": {"type": "string", "minLength": 1},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "protocol_version": {"type": "string", "minLength": 1},
+        "max_message_bytes": {"$ref": "#/$defs/positiveInteger"},
+        "request_id_max_length": {"$ref": "#/$defs/positiveInteger"},
+        "message_type_max_length": {"$ref": "#/$defs/positiveInteger"},
+        "request_cache_size": {"$ref": "#/$defs/positiveInteger"},
+        "initial_sequence": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tick_interval_ms", "matchmaking_timeout_seconds", "reconnect_grace_seconds", "room_close_delay_seconds", "auth_token_ttl_seconds"],
+      "properties": {
+        "tick_interval_ms": {"$ref": "#/$defs/positiveInteger"},
+        "matchmaking_timeout_seconds": {"$ref": "#/$defs/positiveInteger"},
+        "reconnect_grace_seconds": {"$ref": "#/$defs/positiveInteger"},
+        "room_close_delay_seconds": {"$ref": "#/$defs/nonNegativeInteger"},
+        "auth_token_ttl_seconds": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "elo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initial_rating", "scale", "k_factor", "rating_floor", "matchmaking_range"],
+      "properties": {
+        "initial_rating": {"$ref": "#/$defs/positiveInteger"},
+        "scale": {"$ref": "#/$defs/positiveInteger"},
+        "k_factor": {"$ref": "#/$defs/positiveInteger"},
+        "rating_floor": {"$ref": "#/$defs/nonNegativeInteger"},
+        "matchmaking_range": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active_games", "matchmaking_users", "open_rooms", "spectators_per_room", "websocket_connections"],
+      "properties": {
+        "active_games": {"$ref": "#/$defs/positiveInteger"},
+        "matchmaking_users": {"$ref": "#/$defs/positiveInteger"},
+        "open_rooms": {"$ref": "#/$defs/positiveInteger"},
+        "spectators_per_room": {"$ref": "#/$defs/nonNegativeInteger"},
+        "websocket_connections": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "backup_directory", "backup_interval_hours", "busy_timeout_ms"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "backup_directory": {"type": "string", "minLength": 1},
+        "backup_interval_hours": {"$ref": "#/$defs/positiveInteger"},
+        "busy_timeout_ms": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server_path", "client_path", "level", "retention_days", "max_bytes", "backup_count", "debug_payloads"],
+      "properties": {
+        "server_path": {"type": "string", "minLength": 1},
+        "client_path": {"type": "string", "minLength": 1},
+        "level": {"enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]},
+        "retention_days": {"$ref": "#/$defs/positiveInteger"},
+        "max_bytes": {"$ref": "#/$defs/positiveInteger"},
+        "backup_count": {"$ref": "#/$defs/positiveInteger"},
+        "debug_payloads": {"type": "boolean"}
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_bytes", "username_min_length", "username_max_length", "password_min_length"],
+      "properties": {
+        "token_bytes": {"type": "integer", "minimum": 16},
+        "username_min_length": {"$ref": "#/$defs/positiveInteger"},
+        "username_max_length": {"$ref": "#/$defs/positiveInteger"},
+        "password_min_length": {"$ref": "#/$defs/positiveInteger"}
+      }
+    }
+  }
+}

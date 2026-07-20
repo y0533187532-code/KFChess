@@ -28,3 +28,4 @@ class PieceCapturedEvent:
 class GameOverEvent:
     winning_color: str
     captured_piece_id: int
+    ended_at_ms: int
