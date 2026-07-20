@@ -265,7 +265,7 @@ def test_jump_completes_with_piece_still_on_original_cell():
     board, game = make_game([["wK"]])
     game.handle_click(50, 50)
     game.handle_click(50, 50)
-    finish_jump(game.engine)
+    game.handle_wait(DEFAULT_JUMP_DURATION_MS)
     assert board.get_cell(0, 0).token == "wK"
     assert not game._active_moves
 

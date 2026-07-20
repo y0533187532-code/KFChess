@@ -13,6 +13,7 @@ class MoveReason:
     FRIENDLY_DESTINATION = "friendly_destination"
     ILLEGAL_PIECE_MOVE = "illegal_piece_move"
     PATH_BLOCKED = "path_blocked"
+    DESTINATION_RESERVED = "destination_reserved"
 
 
 class CompletionReason:

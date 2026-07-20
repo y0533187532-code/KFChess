@@ -117,3 +117,48 @@ def test_rest_timer_counts_down_after_arrival():
     assert engine.arbiter.active_rests[piece_id] == KING_REST_MS - 300
     engine.wait(KING_REST_MS - 300)
     assert piece_id not in engine.arbiter.active_rests
+
+
+def make_airborne_and_rook_timeline():
+    board = Board(
+        [
+            ["wN", ".", "bR"],
+            [".", ".", "."],
+            [".", ".", "."],
+        ]
+    )
+    state = GameState(board=board)
+    engine = GameEngine(
+        board,
+        state,
+        RuleEngine(),
+        move_durations={"N": 1000, "R": 250},
+        rest_durations={"N": 800, "R": 800},
+    )
+    rook_id = board.get_cell(0, 2).piece_id
+    engine.request_move(0, 0, 1, 2)
+    engine.request_move(0, 2, 0, 0)
+    return board, engine, rook_id
+
+
+def test_rest_started_mid_wait_counts_down_for_remaining_tick_time():
+    _, engine, rook_id = make_airborne_and_rook_timeline()
+
+    engine.wait(1000)
+
+    assert engine.arbiter.active_rests[rook_id] == 300
+
+
+def test_wait_result_is_independent_of_time_partitioning():
+    single_board, single_wait, _ = make_airborne_and_rook_timeline()
+    split_board, split_wait, _ = make_airborne_and_rook_timeline()
+
+    single_wait.wait(1000)
+    split_wait.wait(500)
+    split_wait.wait(500)
+
+    assert single_board.render_rows() == split_board.render_rows()
+    assert dict(single_wait.arbiter.active_rests) == dict(
+        split_wait.arbiter.active_rests
+    )
+    assert single_wait.active_moves == split_wait.active_moves == []

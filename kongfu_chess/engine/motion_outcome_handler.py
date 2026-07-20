@@ -2,13 +2,13 @@
 
 try:
     from ..model.events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
-    from ..realtime.arrival_resolver import apply_arrival
+    from ..realtime.arrival_resolver import ArrivalResult, apply_arrival
     from ..realtime.collision import clear_motion_transit
     from ..rules import resolve_promotion_piece_type
     from .reasons import CompletionReason
 except ImportError:
     from model.events import GameOverEvent, MoveCompletedEvent, PieceCapturedEvent
-    from realtime.arrival_resolver import apply_arrival
+    from realtime.arrival_resolver import ArrivalResult, apply_arrival
     from realtime.collision import clear_motion_transit
     from rules import resolve_promotion_piece_type
     from engine.reasons import CompletionReason
@@ -129,6 +129,72 @@ class MotionOutcomeHandler:
         self._start_rest_for_piece_at(row, col)
         self._publish_completed_jump(jumper, row, col)
         self._publish_if_present(capture_event)
+
+    def complete_airborne_travel(self, move):
+        """Land a detached traveller against the destination's current state."""
+        piece = move.get("piece")
+        if piece is None:
+            return
+
+        to_row, to_col = move["to"]
+        occupant = self._board.get_cell(to_row, to_col)
+        capture_event = None
+        king_captured = False
+
+        if occupant is not None:
+            if occupant.color == piece.color:
+                raise RuntimeError(
+                    "A friendly piece occupied a reserved landing cell"
+                )
+
+            self._board.clear_cell(to_row, to_col)
+            self._cancel_motions_from(to_row, to_col)
+            points_awarded = self._capture_service.record(
+                occupant,
+                (to_row, to_col),
+                piece.color,
+            )
+            capture_event = self._capture_event(
+                occupant,
+                piece.color,
+                (to_row, to_col),
+                points_awarded,
+            )
+            king_captured = (
+                occupant.piece_type == self._settings.game_over_piece_type
+                and occupant.color != piece.color
+            )
+
+        promotion_piece_type = self._resolve_promotion(piece, to_row)
+        arrived_piece = self._board.restore_piece(
+            to_row,
+            to_col,
+            piece,
+            promotion_piece_type=promotion_piece_type,
+        )
+        self._start_rest_for_piece_at(to_row, to_col)
+
+        result = ArrivalResult(
+            captured_piece=occupant,
+            king_captured=king_captured,
+        )
+        game_over_event = None
+        if king_captured:
+            self._state.mark_game_over()
+            game_over_event = GameOverEvent(
+                winning_color=piece.color,
+                captured_piece_id=occupant.piece_id,
+            )
+
+        self._publish_completed_move(
+            arrived_piece.piece_id,
+            move["from"],
+            move["to"],
+            move["to"],
+            result,
+        )
+        self._publish_if_present(capture_event)
+        self._publish_if_present(game_over_event)
 
     def cancel_motion(self, motion, captured_at=None):
         clear_motion_transit(motion)

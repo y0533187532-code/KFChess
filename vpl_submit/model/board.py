@@ -30,8 +30,8 @@ class Board:
         valid_piece_types=DEFAULT_VALID_PIECE_TYPES,
         piece_registry=None,
     ):
-        self._valid_colors = valid_colors
-        self._valid_piece_types = valid_piece_types
+        self._valid_colors = frozenset(valid_colors)
+        self._valid_piece_types = frozenset(valid_piece_types)
         self._piece_registry = (
             PieceRegistry() if piece_registry is None else piece_registry
         )
@@ -71,18 +71,36 @@ class Board:
             raise DuplicateOccupancyError(row, col)
         self._cells[row][col] = self._piece_registry.register(piece)
 
-    def restore_piece(self, row, col, piece):
+    def restore_piece(self, row, col, piece, promotion_piece_type=None):
         """Return the same known piece to an empty cell after temporary removal."""
         if not self.in_bounds(row, col):
             raise IndexError(f"Cell ({row}, {col}) is out of bounds")
         if self._cells[row][col] is not None:
             raise DuplicateOccupancyError(row, col)
+        if promotion_piece_type is not None:
+            replacement = piece.with_piece_type(promotion_piece_type)
+            self._piece_registry.replace_piece(piece, replacement)
+            piece = replacement
         self._piece_registry.reactivate(piece)
         self._cells[row][col] = piece
+        return piece
+
+    def detach_piece(self, row, col):
+        """Temporarily remove and return a piece while preserving its identity."""
+        piece = self.get_cell(row, col)
+        if piece is None:
+            raise ValueError(f"Cannot detach empty cell ({row}, {col})")
+        self.clear_cell(row, col)
+        return piece
 
     @property
     def num_rows(self):
         return len(self._cells)
+
+    @property
+    def valid_colors(self):
+        """Return the immutable color set configured for this board."""
+        return self._valid_colors
 
     @property
     def num_cols(self):

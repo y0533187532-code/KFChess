@@ -7,6 +7,9 @@ from typing import Any, Protocol
 
 class BoardPort(Protocol):
     @property
+    def valid_colors(self) -> frozenset[str]: ...
+
+    @property
     def num_rows(self) -> int: ...
 
     @property
@@ -16,9 +19,17 @@ class BoardPort(Protocol):
 
     def clear_cell(self, row: int, col: int) -> None: ...
 
+    def detach_piece(self, row: int, col: int) -> Any: ...
+
     def place_piece(self, row: int, col: int, piece: Any) -> None: ...
 
-    def restore_piece(self, row: int, col: int, piece: Any) -> None: ...
+    def restore_piece(
+        self,
+        row: int,
+        col: int,
+        piece: Any,
+        promotion_piece_type: str | None = None,
+    ) -> Any: ...
 
 
 class RuleEnginePort(Protocol):
@@ -31,6 +42,9 @@ class RuleEnginePort(Protocol):
 
 
 class ArbiterPort(Protocol):
+    @property
+    def elapsed_ms(self) -> int: ...
+
     @property
     def active_moves(self) -> list[dict]: ...
 
@@ -48,9 +62,25 @@ class ArbiterPort(Protocol):
 
     def remove_motion(self, motion: dict) -> None: ...
 
+    def reservation_at(self, destination: tuple[int, int]) -> Any: ...
+
+    def has_friendly_landing_reservation(
+        self, destination: tuple[int, int], color: str
+    ) -> bool: ...
+
+    def reserve_landing(self, destination: tuple[int, int], piece: Any) -> bool: ...
+
+    def release_landing(
+        self, destination: tuple[int, int], piece_id: int | None = None
+    ) -> None: ...
+
 
 class ScorePolicy(Protocol):
     def points_for(self, captured_piece: Any) -> int: ...
+
+
+class MovementPolicyPort(Protocol):
+    def mode_for(self, piece: Any) -> Any: ...
 
 
 class MotionOutcomePort(Protocol):
@@ -65,6 +95,8 @@ class MotionOutcomePort(Protocol):
     ) -> None: ...
 
     def complete_jump(self, move: dict) -> None: ...
+
+    def complete_airborne_travel(self, move: dict) -> None: ...
 
     def cancel_motion(self, motion: dict, captured_at=None) -> None: ...
 

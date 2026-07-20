@@ -4,10 +4,15 @@ from __future__ import annotations
 
 try:
     from ..model.piece_state import PieceState
-    from .types import GameSnapshot, MoveEventSnapshot, PieceSnapshot
+    from ..realtime.airborne_jump import (
+        is_airborne_travel_motion,
+        is_jump_motion,
+    )
+    from .types import GameSnapshot, MotionSnapshot, MoveEventSnapshot, PieceSnapshot
 except ImportError:
     from model.piece_state import PieceState
-    from engine.types import GameSnapshot, MoveEventSnapshot, PieceSnapshot
+    from realtime.airborne_jump import is_airborne_travel_motion, is_jump_motion
+    from engine.types import GameSnapshot, MotionSnapshot, MoveEventSnapshot, PieceSnapshot
 
 
 class SnapshotBuilder:
@@ -28,6 +33,7 @@ class SnapshotBuilder:
             board_width=self._board.num_cols,
             board_height=self._board.num_rows,
             game_over=self._state.is_game_over,
+            elapsed_ms=self._arbiter.elapsed_ms,
             selected=self._state.selected,
             pieces=tuple(pieces),
             legal_destinations=self._legal_destinations(),
@@ -43,18 +49,38 @@ class SnapshotBuilder:
                 )
                 for event in self._state.move_history.events
             ),
+            active_motions=tuple(self._motion_snapshots()),
         )
 
+    def _motion_snapshots(self):
+        """Copy renderer-relevant motion data without exposing mutable records."""
+        for motion in self._arbiter.active_moves:
+            moving_piece = motion.get("piece")
+            yield MotionSnapshot(
+                from_pos=motion["from"],
+                to_pos=motion["to"],
+                remaining_ms=motion["remaining"],
+                total_ms=motion.get("total_ms", motion["remaining"]),
+                order=motion["order"],
+                is_jump=is_jump_motion(motion),
+                piece_id=(
+                    None if moving_piece is None else moving_piece.piece_id
+                ),
+            )
+
     def _board_piece_snapshots(self, moving_origins):
-        airborne_piece_ids = {
+        detached_piece_ids = {
             move["piece"].piece_id
             for move in self._arbiter.active_moves
-            if move.get("jump") and move.get("piece") is not None
+            if (
+                is_jump_motion(move) or is_airborne_travel_motion(move)
+            )
+            and move.get("piece") is not None
         }
         for row in range(self._board.num_rows):
             for col in range(self._board.num_cols):
                 piece = self._board.get_cell(row, col)
-                if piece is None or piece.piece_id in airborne_piece_ids:
+                if piece is None or piece.piece_id in detached_piece_ids:
                     continue
                 yield self._piece_snapshot(piece, row, col, moving_origins)
 
@@ -81,16 +107,22 @@ class SnapshotBuilder:
 
     def _airborne_piece_snapshots(self):
         for move in self._arbiter.active_moves:
-            jump_piece = move.get("piece")
-            if not move.get("jump") or jump_piece is None:
+            moving_piece = move.get("piece")
+            if moving_piece is None:
+                continue
+            if is_jump_motion(move):
+                state = PieceState.JUMPING
+            elif is_airborne_travel_motion(move):
+                state = PieceState.MOVING
+            else:
                 continue
             row, col = move["from"]
             yield PieceSnapshot(
                 row=row,
                 col=col,
-                token=jump_piece.token,
-                piece_id=jump_piece.piece_id,
-                state=PieceState.JUMPING,
+                token=moving_piece.token,
+                piece_id=moving_piece.piece_id,
+                state=state,
                 rest_remaining_ms=None,
             )
 

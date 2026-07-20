@@ -116,7 +116,7 @@ def show_real_game_window() -> None:
 
             game.handle_wait(16)
             snapshot = game.snapshot()
-            board = view.render(snapshot, game.engine.active_moves)
+            board = view.render(snapshot)
             
             pressed_key = board.show_frame(
                 window_name=GAME_WINDOW_NAME,

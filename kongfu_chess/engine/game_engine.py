@@ -19,7 +19,7 @@ try:
     from ..engine.snapshot_builder import SnapshotBuilder
     from ..engine.types import MoveResult
     from ..model.events import MoveCompletedEvent
-    from ..realtime import RealTimeArbiter
+    from ..realtime import MovementMode, MovementPolicy, RealTimeArbiter
     from ..rules import (
         RuleEngine,
         get_move_route,
@@ -34,7 +34,7 @@ except ImportError:
     from engine.snapshot_builder import SnapshotBuilder
     from engine.types import MoveResult
     from model.events import MoveCompletedEvent
-    from realtime import RealTimeArbiter
+    from realtime import MovementMode, MovementPolicy, RealTimeArbiter
     from rules import (
         RuleEngine,
         get_move_route,
@@ -74,6 +74,7 @@ class GameEngine:
         arbiter_factory=None,
         motion_outcomes=None,
         event_bus=None,
+        movement_policy=None,
     ):
         self._board = board
         self._state = state
@@ -99,6 +100,9 @@ class GameEngine:
         arbiter_type = arbiter_factory or RealTimeArbiter
         self._arbiter = arbiter or arbiter_type(self)
         self._event_bus = event_bus or SynchronousEventBus()
+        self._movement_policy = (
+            MovementPolicy() if movement_policy is None else movement_policy
+        )
         self._event_bus.subscribe(MoveCompletedEvent, state.move_history)
         self._capture_service = CaptureService(
             state,
@@ -140,6 +144,10 @@ class GameEngine:
         return self._settings
 
     @property
+    def movement_policy(self):
+        return self._movement_policy
+
+    @property
     def active_moves(self):
         return self._arbiter.active_moves
 
@@ -174,11 +182,45 @@ class GameEngine:
         piece = self._board.get_cell(from_row, from_col)
         new_route = get_move_route(from_row, from_col, to_row, to_col, piece.piece_type)
         new_from = (from_row, from_col)
+        destination = (to_row, to_col)
+        movement_mode = self._movement_policy.mode_for(piece)
+        duration_ms = (
+            self._settings.move_duration_for(piece.piece_type) * len(new_route)
+        )
+
+        if movement_mode == MovementMode.AIRBORNE:
+            if not self._arbiter.reserve_landing(destination, piece):
+                return MoveResult(
+                    is_accepted=False,
+                    reason=MoveReason.DESTINATION_RESERVED,
+                )
+            try:
+                detached_piece = self._board.detach_piece(from_row, from_col)
+                self._arbiter.schedule_airborne_travel(
+                    detached_piece,
+                    new_from,
+                    destination,
+                    duration_ms,
+                )
+            except Exception:
+                self._arbiter.release_landing(destination, piece.piece_id)
+                if self._board.get_cell(from_row, from_col) is None:
+                    self._board.restore_piece(from_row, from_col, piece)
+                raise
+            return MoveResult(is_accepted=True, reason=MoveReason.OK)
+
+        if self._arbiter.has_friendly_landing_reservation(
+            destination, piece.color
+        ):
+            return MoveResult(
+                is_accepted=False,
+                reason=MoveReason.DESTINATION_RESERVED,
+            )
 
         self._arbiter.schedule_travel(
             new_from,
-            (to_row, to_col),
-            self._settings.move_duration_for(piece.piece_type) * len(new_route),
+            destination,
+            duration_ms,
             new_route,
             piece.color,
         )
@@ -233,6 +275,9 @@ class GameEngine:
 
     def complete_jump(self, move):
         self._motion_outcomes.complete_jump(move)
+
+    def complete_airborne_travel(self, move):
+        self._motion_outcomes.complete_airborne_travel(move)
 
     def cancel_motion(self, motion, captured_at=None):
         self._motion_outcomes.cancel_motion(motion, captured_at=captured_at)

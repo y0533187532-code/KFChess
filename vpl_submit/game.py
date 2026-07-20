@@ -26,11 +26,16 @@ class Game:
         score_policy=None,
         settings=None,
         event_bus=None,
+        movement_policy=None,
+        player_colors=None,
     ):
         self._board = board
         piece_rules = piece_rules or PieceRules()
         rule_engine = rule_engine or RuleEngine(piece_rules)
-        self._state = GameState(board=board)
+        self._state = GameState(
+            board=board,
+            player_colors=player_colors,
+        )
         self._engine = GameEngine(
             board,
             self._state,
@@ -43,12 +48,9 @@ class Game:
             score_policy=score_policy,
             settings=settings,
             event_bus=event_bus,
+            movement_policy=movement_policy,
         )
         self._controller = Controller(board, self._state, self._engine)
-
-    @property
-    def engine(self):
-        return self._engine
 
     @property
     def state(self):

@@ -62,6 +62,7 @@ def test_board_accepts_custom_rule_set_for_future_custom_games():
     board = Board(rows, valid_colors={"g"}, valid_piece_types={"D"})
     piece = board.get_cell(0, 0)
     assert piece.piece_type == "D"
+    assert board.valid_colors == frozenset({"g"})
 
 
 def test_board_internal_cells_are_not_exposed_directly():

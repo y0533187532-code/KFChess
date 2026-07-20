@@ -51,6 +51,33 @@ def test_game_state_add_score_accumulates_points():
     assert state.score_by_color == {"w": 8, "b": 1}
 
 
+def test_game_state_initializes_scores_from_custom_board_colors():
+    board = Board(
+        [["rK", "gK"]],
+        valid_colors={"r", "g"},
+    )
+
+    state = GameState(board=board)
+    state.add_score("g", 4)
+
+    assert state.score_by_color == {"r": 0, "g": 4}
+
+
+def test_game_facade_can_override_player_colors():
+    from kongfu_chess.game import Game
+
+    board = Board([["wK"]])
+    game = Game(board, player_colors={"team_a", "team_b"})
+
+    assert game.state.score_by_color == {"team_a": 0, "team_b": 0}
+
+
+def test_game_state_has_no_legacy_completed_move_writer():
+    state = GameState(board=Board([["wK"]]))
+
+    assert not hasattr(state, "record_completed_move")
+
+
 def test_record_capture_stores_an_immutable_piece_snapshot():
     board = Board([["wK", "bP"]])
     state = GameState(board=board)

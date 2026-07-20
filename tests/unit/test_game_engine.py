@@ -1,3 +1,5 @@
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from kongfu_chess.engine.game_engine import GameEngine
@@ -61,6 +63,7 @@ def test_snapshot_exposes_read_only_game_state():
     assert snapshot.board_width == 2
     assert snapshot.board_height == 1
     assert snapshot.game_over is False
+    assert snapshot.elapsed_ms == 0
     assert snapshot.selected == (0, 0)
     assert snapshot.legal_destinations == ((0, 1),)
     assert snapshot.pieces == (
@@ -73,6 +76,14 @@ def test_snapshot_exposes_read_only_game_state():
             rest_remaining_ms=None,
         ),
     )
+
+
+def test_snapshot_elapsed_time_comes_from_engine_clock():
+    _, _, engine = make_engine([["wK"]])
+
+    engine.wait(250)
+
+    assert engine.snapshot().elapsed_ms == 250
 
 
 def test_request_move_rejects_friendly_destination():
@@ -116,6 +127,25 @@ def test_snapshot_derives_moving_state_from_active_motions_without_mutating_boar
     assert moving.state == PieceState.MOVING
     assert moving.rest_remaining_ms is None
     assert moving.row == 0 and moving.col == 0
+
+
+def test_snapshot_exposes_immutable_copy_of_active_motion():
+    _, _, engine = make_engine([["wK", "."]])
+    engine.request_move(0, 0, 0, 1)
+
+    snapshot = engine.snapshot()
+    motion = snapshot.active_motions[0]
+
+    assert motion.from_pos == (0, 0)
+    assert motion.to_pos == (0, 1)
+    assert motion.remaining_ms == KING_MOVE_MS
+    assert motion.total_ms == KING_MOVE_MS
+    with pytest.raises(FrozenInstanceError):
+        motion.remaining_ms = 0
+
+    engine.wait(1)
+    assert motion.remaining_ms == KING_MOVE_MS
+    assert engine.snapshot().active_motions[0].remaining_ms == KING_MOVE_MS - 1
 
 
 def test_snapshot_returns_mover_to_idle_after_arrival():

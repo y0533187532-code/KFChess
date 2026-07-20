@@ -1,4 +1,11 @@
-from .types import GameSnapshot, MoveEventSnapshot, MoveResult, MoveValidation, PieceSnapshot
+from .types import (
+    GameSnapshot,
+    MotionSnapshot,
+    MoveEventSnapshot,
+    MoveResult,
+    MoveValidation,
+    PieceSnapshot,
+)
 from .capture_service import MaterialScorePolicy
 from .event_bus import SynchronousEventBus
 from .settings import EngineSettings
@@ -10,6 +17,7 @@ __all__ = [
     "MotionOutcomeHandler",
     "SynchronousEventBus",
     "GameSnapshot",
+    "MotionSnapshot",
     "MoveEventSnapshot",
     "MoveResult",
     "MoveValidation",

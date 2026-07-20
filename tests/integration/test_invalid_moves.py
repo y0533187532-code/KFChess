@@ -64,18 +64,18 @@ def test_illegal_shape_leaves_board_unchanged():
 
 def test_game_engine_returns_stable_rule_reason_for_blocked_slide():
     board = Board([["wR", "wP", "."]])
-    engine = Game(board, rule_engine=RuleEngine()).engine
-    result = engine.request_move(0, 0, 0, 2)
+    game = Game(board, rule_engine=RuleEngine())
+    result = game.request_move(0, 0, 0, 2)
     assert result.is_accepted is False
     assert result.reason in STABLE_RULE_REASONS
     assert result.reason == "path_blocked"
-    assert engine.active_moves == []
+    assert game.snapshot().active_motions == ()
 
 
 def test_game_engine_returns_stable_reason_for_friendly_block():
     board = Board([["wR", "wP", "."]])
-    engine = Game(board, rule_engine=RuleEngine()).engine
-    result = engine.request_move(0, 0, 0, 1)
+    game = Game(board, rule_engine=RuleEngine())
+    result = game.request_move(0, 0, 0, 1)
     assert result == MoveResult(is_accepted=False, reason="friendly_destination")
     assert result.reason in STABLE_RULE_REASONS
 
@@ -83,9 +83,9 @@ def test_game_engine_returns_stable_reason_for_friendly_block():
 def test_game_engine_game_over_reason_is_stable():
     board = Board([["wR", "bK"]])
     game = Game(board)
-    game.engine.request_move(0, 0, 0, 1)
+    game.request_move(0, 0, 0, 1)
     game.handle_wait(1000)
-    result = game.engine.request_move(0, 1, 0, 0)
+    result = game.request_move(0, 1, 0, 0)
     assert result.reason == "game_over"
     assert result.reason in STABLE_ENGINE_REASONS
 

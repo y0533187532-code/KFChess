@@ -42,3 +42,9 @@ def test_prepare_vpl_submit_generates_layered_package():
     assert "collision.py" in {
         path.name for path in (out / "realtime").glob("*.py")
     }
+    assert "landing_reservation.py" in {
+        path.name for path in (out / "realtime").glob("*.py")
+    }
+    assert "movement_policy.py" in {
+        path.name for path in (out / "realtime").glob("*.py")
+    }

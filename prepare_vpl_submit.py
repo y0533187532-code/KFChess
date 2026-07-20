@@ -119,6 +119,8 @@ def main():
         "real_time_arbiter.py",
         "arrival_resolver.py",
         "airborne_jump.py",
+        "landing_reservation.py",
+        "movement_policy.py",
     ):
         shutil.copy2(PKG / "realtime" / name, realtime_out / name)
 

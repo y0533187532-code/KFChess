@@ -5,27 +5,32 @@ from __future__ import annotations
 from types import MappingProxyType
 
 try:
-    from ..config import BLACK_COLOR, WHITE_COLOR
+    from ..config import DEFAULT_VALID_COLORS
     from .captured_piece import CapturedPiece
-    from .events import MoveCompletedEvent
     from .move_history import MoveHistory
 except ImportError:
-    from config import BLACK_COLOR, WHITE_COLOR
+    from config import DEFAULT_VALID_COLORS
     from model.captured_piece import CapturedPiece
-    from model.events import MoveCompletedEvent
     from model.move_history import MoveHistory
 
 
 class GameState:
     """Owns game progress and exposes mutations as named domain behaviors."""
 
-    def __init__(self, board, move_history=None):
+    def __init__(self, board, move_history=None, player_colors=None):
         self._board = board
         self._game_over = False
         self._selected: tuple[int, int] | None = None
         self._promotion_choice: str | None = None
         self._captured_pieces: list[CapturedPiece] = []
-        self._score_by_color = {WHITE_COLOR: 0, BLACK_COLOR: 0}
+        configured_colors = (
+            getattr(board, "valid_colors", DEFAULT_VALID_COLORS)
+            if player_colors is None
+            else frozenset(player_colors)
+        )
+        self._score_by_color = {
+            color: 0 for color in configured_colors
+        }
         self._move_history = move_history or MoveHistory()
 
     @property
@@ -93,18 +98,3 @@ class GameState:
 
     def add_score(self, color: str, points: int) -> None:
         self._score_by_color[color] = self._score_by_color.get(color, 0) + points
-
-    def record_completed_move(
-        self, piece_id, token, from_pos, requested_to, actual_to, reason
-    ) -> None:
-        """Compatibility behavior; new engine code publishes this event."""
-        self._move_history.handle(
-            MoveCompletedEvent(
-                piece_id=piece_id,
-                token=token,
-                from_pos=from_pos,
-                requested_to=requested_to,
-                actual_to=actual_to,
-                reason=reason,
-            )
-        )

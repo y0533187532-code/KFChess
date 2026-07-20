@@ -26,8 +26,25 @@ def motion_total_ms(motion):
     return motion["cell_ms"] * len(route)
 
 
-def get_cell_occupant(board, cell, active_moves):
+def get_cell_occupant(
+    board,
+    cell,
+    active_moves,
+    landing_reservations=None,
+    moving_color=None,
+):
     """Return (kind, color, value) where kind is 'board' or 'transit'."""
+    reservation = next(
+        (
+            item
+            for item in landing_reservations or ()
+            if item.destination == cell and item.color == moving_color
+        ),
+        None,
+    )
+    if reservation is not None:
+        return ("reservation", reservation.color, reservation)
+
     row, col = cell
     piece = board.get_cell(row, col)
     if piece is not None:
@@ -51,10 +68,23 @@ def clear_motion_transit(motion):
     motion.pop("transit_cell", None)
 
 
-def resolve_travel_cell_entry(executor, motion, route_index, cell, active_moves):
+def resolve_travel_cell_entry(
+    executor,
+    motion,
+    route_index,
+    cell,
+    active_moves,
+    landing_reservations=None,
+):
     """Process one timed cell entry; return True if the motion ended."""
     motion["cells_entered"] = route_index + 1
-    occupant = get_cell_occupant(executor.board, cell, active_moves)
+    occupant = get_cell_occupant(
+        executor.board,
+        cell,
+        active_moves,
+        landing_reservations,
+        moving_color=motion["color"],
+    )
 
     clear_motion_transit(motion)
 

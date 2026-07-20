@@ -14,6 +14,7 @@ from .core.img import Img
 from .pieces.piece_animation_manager import PieceAnimationManager
 from .pieces.piece_assets import TOKEN_PIECE_TYPE_INDEX
 from .pieces.piece_positioner import PiecePositioner
+from .view_settings import ViewSettings
 from .layout.player_panel import PlayerPanel
 from .layout.screen_layout import (
     build_screen_canvas,
@@ -44,12 +45,12 @@ class GameView:
         ASSET_STATE_LONG_REST: ASSET_STATE_LONG_REST,
     }
 
-    def __init__(self, rest_durations=None):
+    def __init__(self, rest_durations=None, view_settings=None):
+        view_settings = ViewSettings() if view_settings is None else view_settings
         self._animation_manager = PieceAnimationManager()
         self._positioner = PiecePositioner()
-        self._move_log = MoveLog()
-        self._frame_index = 0
-        self._player_panel = PlayerPanel()
+        self._move_log = MoveLog(view_settings)
+        self._player_panel = PlayerPanel(view_settings)
         self._rest_durations = MappingProxyType(
             dict(
                 DEFAULT_REST_DURATION_MS_BY_PIECE_TYPE
@@ -62,10 +63,9 @@ class GameView:
     def _animators_by_piece_id(self):
         return self._animation_manager.animators_by_piece_id
 
-    def render(self, snapshot: GameSnapshot, active_moves: list[dict] | None = None) -> Img:
+    def render(self, snapshot: GameSnapshot) -> Img:
         """Draw the full board from a read-only snapshot."""
-        active_moves = active_moves or []
-        self._move_log.record_new_moves(snapshot, active_moves, self._frame_index)
+        self._move_log.record_new_moves(snapshot)
         board = load_board()
 
         for piece in snapshot.pieces:
@@ -77,7 +77,9 @@ class GameView:
                 piece.token,
                 self._asset_state_for(piece.state),
             )
-            active_move = self._positioner.find_active_move_for_piece(piece, active_moves)
+            active_move = self._positioner.find_active_move_for_piece(
+                piece, snapshot.active_motions
+            )
 
             x, y = self._positioner.pixel_position_for_piece(piece, active_move)
             current_frame.draw_on(board, x, y)
@@ -99,16 +101,15 @@ class GameView:
 
         screen = build_screen_canvas()
         draw_board_on_screen(screen, board)
-        status_text = self._player_panel.status_text(snapshot, active_moves)
+        status_text = self._player_panel.status_text(snapshot)
         draw_status_text(screen, status_text)
-        white_moves, black_moves = self._move_log.lines_by_color()
+        first_player_moves, second_player_moves = self._move_log.lines_by_color()
         left_text, right_text = self._player_panel.side_panel_lines(
             snapshot,
-            white_moves,
-            black_moves,
+            first_player_moves,
+            second_player_moves,
         )
         draw_side_panel_text(screen, left_text, right_text)
-        self._frame_index += 1
         return screen
 
     def _asset_state_for(self, state: PieceState | str) -> str:

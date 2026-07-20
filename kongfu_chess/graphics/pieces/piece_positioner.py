@@ -1,4 +1,5 @@
 from kongfu_chess.config import CELL_SIZE_PX
+from kongfu_chess.engine.types import MotionSnapshot
 
 from ..board.board_coordinates import cell_to_pixels
 
@@ -12,35 +13,34 @@ class PiecePositioner:
     def find_active_move_for_piece(
         self,
         piece,
-        active_moves: list[dict],
-    ) -> dict | None:
+        active_motions: tuple[MotionSnapshot, ...],
+    ) -> MotionSnapshot | None:
         """Return the active motion record for this piece, if it exists."""
-        for move in active_moves:
-            moving_piece = move.get("piece")
-            if moving_piece is not None and moving_piece.piece_id != piece.piece_id:
+        for motion in active_motions:
+            if motion.piece_id is not None and motion.piece_id != piece.piece_id:
                 continue
-            move_row, move_col = move["from"]
+            move_row, move_col = motion.from_pos
             if (piece.row, piece.col) == (move_row, move_col):
-                return move
+                return motion
         return None
 
     def pixel_position_for_piece(
         self,
         piece,
-        active_move: dict | None,
+        active_motion: MotionSnapshot | None,
     ) -> tuple[int, int]:
         """Return the top-left pixel position for the piece on the board."""
-        if active_move is None:
+        if active_motion is None:
             return cell_to_pixels(piece.row, piece.col)
 
-        from_row, from_col = active_move["from"]
-        to_row, to_col = active_move["to"]
+        from_row, from_col = active_motion.from_pos
+        to_row, to_col = active_motion.to_pos
 
         start_x, start_y = cell_to_pixels(from_row, from_col)
         end_x, end_y = cell_to_pixels(to_row, to_col)
 
-        total_ms = active_move["total_ms"]
-        remaining_ms = active_move["remaining"]
+        total_ms = active_motion.total_ms
+        remaining_ms = active_motion.remaining_ms
         if total_ms <= 0:
             return cell_to_pixels(piece.row, piece.col)
 
@@ -50,7 +50,7 @@ class PiecePositioner:
 
         x = int(start_x + (end_x - start_x) * progress)
         y = int(start_y + (end_y - start_y) * progress)
-        if active_move.get("jump"):
+        if active_motion.is_jump:
             y -= self._jump_offset(progress)
 
         return x, y

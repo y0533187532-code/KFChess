@@ -1,8 +1,21 @@
 """Airborne jump motion helpers and in-flight capture resolution."""
 
+try:
+    from .movement_policy import MovementMode
+except ImportError:
+    from realtime.movement_policy import MovementMode
+
 
 def is_jump_motion(motion):
     return motion.get("jump", False)
+
+
+def is_airborne_travel_motion(motion):
+    """True for travel that detached its piece and resolves only on landing."""
+    return (
+        not is_jump_motion(motion)
+        and motion.get("movement_mode") == MovementMode.AIRBORNE
+    )
 
 
 def collect_airborne_jumps(group_moves, active_moves):
