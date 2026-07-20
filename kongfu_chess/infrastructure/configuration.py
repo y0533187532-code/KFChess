@@ -76,6 +76,11 @@ class SecurityConfig:
     username_min_length: int
     username_max_length: int
     password_min_length: int
+    password_salt_bytes: int
+    scrypt_n: int
+    scrypt_r: int
+    scrypt_p: int
+    password_hash_bytes: int
 
 
 @dataclass(frozen=True)
@@ -219,6 +224,15 @@ class ConfigProvider:
                 password_min_length=cls._integer(
                     security, "password_min_length", minimum=1
                 ),
+                password_salt_bytes=cls._integer(
+                    security, "password_salt_bytes", minimum=16
+                ),
+                scrypt_n=cls._power_of_two(security, "scrypt_n", minimum=2),
+                scrypt_r=cls._integer(security, "scrypt_r", minimum=1),
+                scrypt_p=cls._integer(security, "scrypt_p", minimum=1),
+                password_hash_bytes=cls._integer(
+                    security, "password_hash_bytes", minimum=16
+                ),
             ),
         )
 
@@ -257,6 +271,15 @@ class ConfigProvider:
         value = section.get(key)
         if not isinstance(value, bool):
             raise ConfigError(f"{key} must be a boolean")
+        return value
+
+    @classmethod
+    def _power_of_two(
+        cls, section: Mapping[str, Any], key: str, *, minimum: int
+    ) -> int:
+        value = cls._integer(section, key, minimum=minimum)
+        if value & (value - 1):
+            raise ConfigError(f"{key} must be a power of two")
         return value
 
     @classmethod

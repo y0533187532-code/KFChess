@@ -26,6 +26,12 @@
   "username_taken": "שם המשתמש כבר בשימוש.",
   "invalid_credentials": "שם המשתמש או הסיסמה שגויים.",
   "invalid_registration": "פרטי ההרשמה אינם תקינים.",
+  "invalid_username": "מבנה שם המשתמש אינו תקין.",
+  "password_too_short": "הסיסמה קצרה מדי.",
+  "invalid_email": "כתובת המייל אינה תקינה.",
+  "invalid_phone": "מספר הטלפון אינו תקין.",
+  "account_disabled": "החשבון אינו זמין.",
+  "token_revoked": "ההתחברות בוטלה.",
   "reconnect_expired": "חלון החיבור מחדש הסתיים.",
   "internal_error": "אירעה תקלה פנימית בשרת."
 }

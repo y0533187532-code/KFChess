@@ -33,10 +33,16 @@ class TokenService:
         return IssuedToken(value, expires_at_ms)
 
     def verify_auth(self, value: str, *, now_ms: int):
-        return self._auth_sessions.find_valid(self.hash_token(value), now_ms=now_ms)
+        return self.validate_auth(value, now_ms=now_ms).session
+
+    def validate_auth(self, value: str, *, now_ms: int):
+        return self._auth_sessions.validate(self.hash_token(value), now_ms=now_ms)
 
     def revoke_auth(self, value: str, *, now_ms: int) -> bool:
         return self._auth_sessions.revoke(self.hash_token(value), now_ms=now_ms)
+
+    def revoke_user_auth(self, user_id: int, *, now_ms: int) -> int:
+        return self._auth_sessions.revoke_user(user_id, now_ms=now_ms)
 
     def issue_game(
         self,

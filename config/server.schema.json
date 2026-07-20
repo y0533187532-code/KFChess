@@ -95,12 +95,17 @@
     "security": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["token_bytes", "username_min_length", "username_max_length", "password_min_length"],
+      "required": ["token_bytes", "username_min_length", "username_max_length", "password_min_length", "password_salt_bytes", "scrypt_n", "scrypt_r", "scrypt_p", "password_hash_bytes"],
       "properties": {
         "token_bytes": {"type": "integer", "minimum": 16},
         "username_min_length": {"$ref": "#/$defs/positiveInteger"},
         "username_max_length": {"$ref": "#/$defs/positiveInteger"},
-        "password_min_length": {"$ref": "#/$defs/positiveInteger"}
+        "password_min_length": {"$ref": "#/$defs/positiveInteger"},
+        "password_salt_bytes": {"type": "integer", "minimum": 16},
+        "scrypt_n": {"type": "integer", "minimum": 2},
+        "scrypt_r": {"$ref": "#/$defs/positiveInteger"},
+        "scrypt_p": {"$ref": "#/$defs/positiveInteger"},
+        "password_hash_bytes": {"type": "integer", "minimum": 16}
       }
     }
   }

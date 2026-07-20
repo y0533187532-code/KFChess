@@ -49,6 +49,11 @@
     "token_bytes": 32,
     "username_min_length": 3,
     "username_max_length": 20,
-    "password_min_length": 6
+    "password_min_length": 6,
+    "password_salt_bytes": 16,
+    "scrypt_n": 16384,
+    "scrypt_r": 8,
+    "scrypt_p": 1,
+    "password_hash_bytes": 32
   }
 }

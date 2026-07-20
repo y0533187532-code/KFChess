@@ -26,6 +26,12 @@
   "username_taken": "This username is already in use.",
   "invalid_credentials": "The username or password is incorrect.",
   "invalid_registration": "The registration details are invalid.",
+  "invalid_username": "The username format is invalid.",
+  "password_too_short": "The password is too short.",
+  "invalid_email": "The email address is invalid.",
+  "invalid_phone": "The phone number is invalid.",
+  "account_disabled": "This account is unavailable.",
+  "token_revoked": "The session was revoked.",
   "reconnect_expired": "The reconnection window has expired.",
   "internal_error": "An internal server error occurred."
 }

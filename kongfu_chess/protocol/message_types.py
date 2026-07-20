@@ -7,6 +7,8 @@ class MessageType(str, Enum):
     REGISTER_REQUEST = "register_request"
     LOGIN_REQUEST = "login_request"
     LOGOUT_REQUEST = "logout_request"
+    VALIDATE_AUTH_REQUEST = "validate_auth_request"
+    DELETE_ACCOUNT_REQUEST = "delete_account_request"
     PLAY_REQUEST = "play_request"
     CANCEL_MATCHMAKING = "cancel_matchmaking"
     CREATE_ROOM_REQUEST = "create_room_request"

@@ -23,6 +23,12 @@ class AuthSessionRecord:
 
 
 @dataclass(frozen=True)
+class AuthSessionValidation:
+    status: str
+    session: AuthSessionRecord | None
+
+
+@dataclass(frozen=True)
 class GameTokenRecord:
     id: int
     game_id: str
