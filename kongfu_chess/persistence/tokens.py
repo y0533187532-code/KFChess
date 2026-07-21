@@ -74,6 +74,13 @@ class TokenService:
             self.hash_token(value), grace_expires_at_ms=grace_expires_at_ms
         )
 
+    def begin_game_grace_for_user(
+        self, game_id: str, user_id: int, *, grace_expires_at_ms: int
+    ) -> bool:
+        return self._game_tokens.begin_grace_for_user(
+            game_id, user_id, grace_expires_at_ms=grace_expires_at_ms
+        )
+
     def restore_game(self, value: str, *, now_ms: int) -> bool:
         return self._game_tokens.restore_active(
             self.hash_token(value), now_ms=now_ms

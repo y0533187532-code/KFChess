@@ -20,6 +20,7 @@ class SessionClosedError(RuntimeError):
 class SessionCommandType(str, Enum):
     MOVE = "move"
     JUMP = "jump"
+    SNAPSHOT = "snapshot"
     TICK = "tick"
     DISCONNECT = "disconnect"
     RECONNECT = "reconnect"
@@ -73,6 +74,7 @@ class GameSession:
         *,
         initial_sequence: int,
         request_cache_size: int,
+        on_sequence_changed=None,
     ):
         if request_cache_size < 1:
             raise ValueError("request_cache_size must be positive")
@@ -80,6 +82,7 @@ class GameSession:
         self._handlers = MappingProxyType(dict(handlers))
         self._sequence = initial_sequence
         self._request_cache_size = request_cache_size
+        self._on_sequence_changed = on_sequence_changed
         self._queue: asyncio.Queue = asyncio.Queue()
         self._pending: dict[str, asyncio.Future] = {}
         self._completed: OrderedDict[str, CommandResult] = OrderedDict()
@@ -193,6 +196,14 @@ class GameSession:
                     raise TypeError("GameSession handlers must return HandlerResult")
             if handled.changed:
                 self._sequence += 1
+                if self._on_sequence_changed is not None:
+                    callback = self._on_sequence_changed(
+                        self._game_id,
+                        self._sequence,
+                        dict(handled.payload),
+                    )
+                    if inspect.isawaitable(callback):
+                        await callback
             result = CommandResult(
                 request_id=command.request_id,
                 accepted=handled.accepted,

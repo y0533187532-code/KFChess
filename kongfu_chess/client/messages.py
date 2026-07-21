@@ -69,6 +69,117 @@ class ClientMessageFactory:
             {"auth_token": auth_token, "code": code.upper()},
         )
 
+    def resync(
+        self, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._game_authenticated(
+            MessageType.RESYNC_REQUEST, auth_token, game_token, game_id
+        )
+
+    def lifecycle_status(
+        self, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._game_authenticated(
+            MessageType.GAME_LIFECYCLE_STATUS,
+            auth_token,
+            game_token,
+            game_id,
+        )
+
+    def game_disconnect(
+        self, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._game_authenticated(
+            MessageType.GAME_DISCONNECT,
+            auth_token,
+            game_token,
+            game_id,
+        )
+
+    def game_reconnect(
+        self, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._game_authenticated(
+            MessageType.GAME_RECONNECT,
+            auth_token,
+            game_token,
+            game_id,
+        )
+
+    def move(
+        self,
+        auth_token: str,
+        game_token: str,
+        game_id: str,
+        piece_id: int,
+        expected_from: tuple[int, int],
+        target: tuple[int, int],
+    ) -> MessageEnvelope:
+        return self._gameplay(
+            MessageType.MOVE_REQUEST,
+            auth_token,
+            game_token,
+            game_id,
+            piece_id,
+            expected_from,
+            target,
+        )
+
+    def jump(
+        self,
+        auth_token: str,
+        game_token: str,
+        game_id: str,
+        piece_id: int,
+        expected_from: tuple[int, int],
+    ) -> MessageEnvelope:
+        return self._gameplay(
+            MessageType.JUMP_REQUEST,
+            auth_token,
+            game_token,
+            game_id,
+            piece_id,
+            expected_from,
+            expected_from,
+        )
+
+    def _gameplay(
+        self,
+        message_type,
+        auth_token: str,
+        game_token: str,
+        game_id: str,
+        piece_id: int,
+        expected_from: tuple[int, int],
+        target: tuple[int, int],
+    ) -> MessageEnvelope:
+        return self._make(
+            message_type,
+            {
+                "auth_token": auth_token,
+                "game_token": game_token,
+                "game_id": game_id,
+                "piece_id": piece_id,
+                "expected_from": {
+                    "row": expected_from[0],
+                    "col": expected_from[1],
+                },
+                "target": {"row": target[0], "col": target[1]},
+            },
+        )
+
+    def _game_authenticated(
+        self, message_type, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._make(
+            message_type,
+            {
+                "auth_token": auth_token,
+                "game_token": game_token,
+                "game_id": game_id,
+            },
+        )
+
     def _authenticated(self, message_type, auth_token: str) -> MessageEnvelope:
         return self._make(message_type, {"auth_token": auth_token})
 

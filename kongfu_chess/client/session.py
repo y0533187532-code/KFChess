@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping
 
 
@@ -109,6 +109,17 @@ class ClientSessionState:
         if self.game is not None and self.game.mode == "ROOM":
             self.game = None
         self.room = None
+
+    def update_room_status(self, status: str, *, gameplay_started: bool) -> None:
+        if self.room is not None:
+            self.room = replace(
+                self.room,
+                status=status,
+                gameplay_started=gameplay_started,
+            )
+
+    def clear_game(self) -> None:
+        self.game = None
 
     def clear(self) -> None:
         self.user_id = None

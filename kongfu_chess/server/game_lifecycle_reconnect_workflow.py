@@ -59,6 +59,46 @@ class GameLifecycleReconnectWorkflow:
             self._context.pause_session(game_id)
             return self._context.views.create(self._context.require(game_id))
 
+    def disconnect_transport(
+        self, game_id: str, user_id: int, *, now_ms: int
+    ) -> GameLifecycleView | None:
+        with self._context.lock:
+            record = self._context.lifecycles.by_id(game_id)
+            if record is None:
+                return None
+            try:
+                player = self._context.player_for(game_id, user_id)
+            except GameLifecycleError:
+                return None
+            if record.state not in {
+                GameLifecycleState.ACTIVE.value,
+                GameLifecycleState.PAUSED_FOR_RECONNECT.value,
+            } or not player.connected:
+                return None
+            deadline = self._reconnect.deadline(now_ms)
+            if not self._tokens.begin_game_grace_for_user(
+                game_id, user_id, grace_expires_at_ms=deadline
+            ):
+                return None
+            if not self._context.lifecycles.disconnect_player(
+                game_id, user_id, deadline_ms=deadline
+            ):
+                return None
+            players = self._context.lifecycles.players(game_id)
+            double_disconnect = self._reconnect.is_double_disconnect(players)
+            self._context.lifecycles.transition(
+                game_id,
+                from_states=(
+                    GameLifecycleState.ACTIVE.value,
+                    GameLifecycleState.PAUSED_FOR_RECONNECT.value,
+                ),
+                target=GameLifecycleState.PAUSED_FOR_RECONNECT.value,
+                now_ms=now_ms,
+                double_disconnect=record.double_disconnect or double_disconnect,
+            )
+            self._context.pause_session(game_id)
+            return self._context.views.create(self._context.require(game_id))
+
     def reconnect(
         self,
         auth_token: str,

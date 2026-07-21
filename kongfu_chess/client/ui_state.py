@@ -14,6 +14,7 @@ class ClientScreen(str, Enum):
     MATCH_FOUND = "match_found"
     ROOM_ENTRY = "room_entry"
     ROOM_LOBBY = "room_lobby"
+    GAME_BOARD = "game_board"
 
 
 class UiAction(str, Enum):
@@ -66,6 +67,12 @@ class ClientUiState:
     queue_enqueued_at_ms: int | None = None
     queue_expires_at_ms: int | None = None
     now_ms: int = 0
+    game_snapshot: object | None = None
+    game_sequence: int | None = None
+    game_lifecycle_state: str | None = None
+    game_reconnect_deadline_ms: int | None = None
+    game_selected_cell: tuple[int, int] | None = None
+    game_selected_piece_id: int | None = None
 
     def display_value(self, field_name: str) -> str:
         value = self.fields[field_name]
@@ -83,3 +90,10 @@ class ClientUiState:
         if self.queue_enqueued_at_ms is None:
             return None
         return max(0, self.now_ms - self.queue_enqueued_at_ms) // 1000
+
+    @property
+    def reconnect_seconds_remaining(self) -> int | None:
+        if self.game_reconnect_deadline_ms is None:
+            return None
+        remaining = max(0, self.game_reconnect_deadline_ms - self.now_ms)
+        return (remaining + 999) // 1000

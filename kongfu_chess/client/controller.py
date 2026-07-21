@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..protocol import MessageEnvelope, MessageType
 from .authentication_flow import AuthenticationFlow
 from .flow_context import ClientFlowContext
+from .gameplay_flow import GameplayFlow
 from .matchmaking_flow import MatchmakingFlow
 from .room_flow import RoomFlow
 from .ui_state import ClientScreen, ClientUiConstraints, ClientUiState, UiAction
@@ -28,6 +29,8 @@ class ClientController:
         constraints: ClientUiConstraints,
         *,
         status_poll_interval_ms: int = 1000,
+        snapshot_poll_interval_ms: int = 1000,
+        active_snapshot_poll_interval_ms: int = 200,
     ):
         self._context = ClientFlowContext(
             session, messages, dispatcher, localizer, constraints
@@ -37,7 +40,16 @@ class ClientController:
             self._context,
             status_poll_interval_ms=status_poll_interval_ms,
         )
-        self._rooms = RoomFlow(self._context)
+        self._rooms = RoomFlow(
+            self._context,
+            status_poll_interval_ms=status_poll_interval_ms,
+        )
+        self._gameplay = GameplayFlow(
+            self._context,
+            snapshot_poll_interval_ms=snapshot_poll_interval_ms,
+            lifecycle_poll_interval_ms=status_poll_interval_ms,
+            active_snapshot_poll_interval_ms=active_snapshot_poll_interval_ms,
+        )
         self._action_flows = (
             self._authentication,
             self._matchmaking,
@@ -89,9 +101,20 @@ class ClientController:
             if flow.handle_action(normalized_action):
                 return
 
+    def handle_board_cell(self, row: int, col: int) -> None:
+        self._gameplay.handle_board_cell(row, col)
+
     def tick(self, now_ms: int) -> None:
         self.state.now_ms = now_ms
         self._matchmaking.tick(now_ms)
+        self._rooms.tick(now_ms)
+        self._gameplay.tick(now_ms)
+
+    def handle_push(self, envelope: MessageEnvelope) -> None:
+        if envelope.type == MessageType.STATE_UPDATE.value:
+            self._gameplay.handle_push(envelope.payload)
+            return
+        self._gameplay.handle_lifecycle_push(envelope.type, envelope.payload)
 
     def handle_response(self, envelope: MessageEnvelope) -> None:
         operation = self._context.complete(envelope.request_id)
@@ -100,21 +123,34 @@ class ClientController:
             return
         if envelope.type == MessageType.ERROR.value or payload.get("accepted") is False:
             error_code = str(payload.get("code", "internal_error"))
+            if self._gameplay.handle_failure(operation, error_code):
+                return
             if not self._authentication.handle_failure(operation, error_code):
                 self._context.show_error(error_code)
+            return
+        if self._gameplay.handle_success(operation, envelope.type, payload):
             return
         if self._authentication.handle_success(operation, payload):
             return
         if self._matchmaking.handle_success(envelope.type, payload):
+            self._gameplay.activate_if_ready()
             return
-        self._rooms.handle_success(operation, envelope.type, payload)
+        if self._rooms.handle_success(operation, envelope.type, payload):
+            self._gameplay.activate_if_ready()
 
     def handle_transport_failure(
         self, request_id: str, error_code: str = "network_error"
     ) -> None:
         operation = self._context.complete(request_id)
+        if error_code == "network_error" and self._gameplay.handle_network_loss():
+            return
+        if self._gameplay.handle_failure(operation, error_code):
+            return
         if not self._authentication.handle_failure(operation, error_code):
             self._context.show_error(error_code)
+
+    def disconnect_active_game(self) -> None:
+        self._gameplay.disconnect_active_game()
 
     def _append_character(self, field_name: str, character: str) -> None:
         if field_name == "room_code":

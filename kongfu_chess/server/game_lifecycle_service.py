@@ -27,6 +27,7 @@ from .game_lifecycle_terminal_workflow import (
 from .game_lifecycle_view_factory import GameLifecycleViewFactory
 from .game_mode import GameMode, MatchOutcome, PlayerSeat
 from .game_result_finalizer import GameResultFinalizer
+from .gameplay_service import GameSessionRegistry
 from .reconnect_policy import ReconnectAction, ReconnectPolicy
 
 
@@ -50,10 +51,15 @@ class GameLifecycleService:
         sessions=None,
         room_repository=None,
         seat_adapter=CHESS_SEAT_ADAPTER,
+        runtime_factory=None,
     ):
         self._tokens = token_service
         self._lifecycles = lifecycle_repository
-        self._sessions = sessions
+        self._runtime_factory = runtime_factory
+        session_backend = (
+            runtime_factory.registry if runtime_factory is not None else sessions
+        )
+        self._sessions = session_backend
         self._rooms = room_repository
         self._authorization = GameLifecycleAuthorization(
             auth_service, token_service, seat_adapter=seat_adapter
@@ -68,7 +74,7 @@ class GameLifecycleService:
             self._authorization,
             self._views,
             self._lock,
-            sessions=sessions,
+            sessions=session_backend,
         )
         self._finalizer = GameResultFinalizer(
             lifecycle_repository,
@@ -79,10 +85,15 @@ class GameLifecycleService:
             self._views,
             room_repository=room_repository,
             pause_session=self._context.pause_session,
+            teardown_runtime=(
+                runtime_factory.teardown if runtime_factory is not None else None
+            ),
             seat_adapter=seat_adapter,
         )
         self._registration = GameLifecycleRegistration(
-            self._context, room_repository=room_repository
+            self._context,
+            room_repository=room_repository,
+            runtime_factory=runtime_factory,
         )
         self._reconnect_workflow = GameLifecycleReconnectWorkflow(
             self._context, token_service, self._reconnect, self._finalizer
@@ -113,6 +124,43 @@ class GameLifecycleService:
             reconnect_grace_seconds=config.timing.reconnect_grace_seconds,
             **overrides,
         )
+
+    @classmethod
+    def with_runtime(
+        cls,
+        auth_service,
+        token_service,
+        lifecycle_repository,
+        user_repository,
+        match_repository,
+        elo_service,
+        config,
+        **overrides,
+    ):
+        from .game_runtime_factory import GameRuntimeFactory
+        from .tick_scheduler import TickScheduler
+
+        registry = GameSessionRegistry()
+        scheduler = TickScheduler(tick_interval_ms=config.timing.tick_interval_ms)
+        runtime_factory = GameRuntimeFactory(
+            registry,
+            scheduler,
+            initial_sequence=config.network.initial_sequence,
+            request_cache_size=config.network.request_cache_size,
+        )
+        service = cls(
+            auth_service,
+            token_service,
+            lifecycle_repository,
+            user_repository,
+            match_repository,
+            elo_service,
+            reconnect_grace_seconds=config.timing.reconnect_grace_seconds,
+            runtime_factory=runtime_factory,
+            **overrides,
+        )
+        runtime_factory.bind_lifecycle(service)
+        return service, registry, runtime_factory
 
     def register_play_match(self, match, *, now_ms: int | None = None):
         return self._registration.register_play_match(match, now_ms=now_ms)
@@ -184,6 +232,13 @@ class GameLifecycleService:
     ) -> GameLifecycleView:
         return self._reconnect_workflow.disconnect(
             auth_token, game_token, game_id, now_ms=now_ms
+        )
+
+    def disconnect_transport(
+        self, game_id: str, user_id: int, *, now_ms: int
+    ) -> GameLifecycleView | None:
+        return self._reconnect_workflow.disconnect_transport(
+            game_id, user_id, now_ms=now_ms
         )
 
     def reconnect(

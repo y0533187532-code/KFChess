@@ -17,16 +17,26 @@ class ClientFlowContext:
         self._dispatcher = dispatcher
         self._localizer = localizer
         self._pending: dict[str, str] = {}
+        self._foreground_pending: set[str] = set()
 
-    def submit(self, envelope: MessageEnvelope, operation: str) -> None:
+    def submit(
+        self,
+        envelope: MessageEnvelope,
+        operation: str,
+        *,
+        show_loading: bool = True,
+    ) -> None:
         self._pending[envelope.request_id] = operation
         self.state.inline_message = None
-        self.state.loading = True
+        if show_loading:
+            self._foreground_pending.add(envelope.request_id)
+            self.state.loading = True
         self._dispatcher.submit(envelope)
 
     def complete(self, request_id: str) -> str | None:
         operation = self._pending.pop(request_id, None)
-        self.state.loading = bool(self._pending)
+        self._foreground_pending.discard(request_id)
+        self.state.loading = bool(self._foreground_pending)
         return operation
 
     def show(self, screen: ClientScreen) -> None:

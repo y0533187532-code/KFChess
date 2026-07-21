@@ -24,8 +24,12 @@ class Auth:
 
 
 class Tokens:
+    def __init__(self, role="PLAYER", color="w"):
+        self.role = role
+        self.color = color
+
     def verify_game(self, token, *, game_id, now_ms):
-        return SimpleNamespace(user_id=1, role="PLAYER", color="w")
+        return SimpleNamespace(user_id=1, role=self.role, color=self.color)
 
 
 class Engine:
@@ -108,22 +112,49 @@ def test_structured_move_and_jump_routes_return_authoritative_sequences():
                 ),
             )
         )
+        snapshot = await router.route(
+            RequestContext(
+                "connection-1",
+                envelope(
+                    "resync_request",
+                    {
+                        "auth_token": "auth",
+                        "game_token": "game-token",
+                        "game_id": "game-1",
+                    },
+                    "request-4",
+                ),
+            )
+        )
         await session.close()
-        return engine, moved, invalid_jump, valid_jump
+        return engine, moved, invalid_jump, valid_jump, snapshot
 
-    engine, moved, invalid_jump, valid_jump = asyncio.run(scenario())
+    engine, moved, invalid_jump, valid_jump, snapshot = asyncio.run(scenario())
 
-    assert moved.payload == {
-        "accepted": True,
-        "code": "ok",
-        "sequence": 5,
-        "piece_id": 7,
-    }
+    assert moved.payload["accepted"] is True
+    assert moved.payload["code"] == "ok"
+    assert moved.payload["sequence"] == 5
+    assert moved.payload["piece_id"] == 7
+    assert "snapshot" in moved.payload
     assert invalid_jump.payload["code"] == "invalid_field"
     assert invalid_jump.payload["sequence"] == 5
     assert valid_jump.payload["sequence"] == 6
     assert engine.moves == [(1, 4, 3, 4)]
     assert engine.jumps == [(1, 4)]
+    assert snapshot.type == "snapshot"
+    assert snapshot.payload["board_width"] == 8
+    assert snapshot.payload["pieces"] == [
+        {
+            "row": 1,
+            "col": 4,
+            "token": "wP",
+            "piece_id": 7,
+            "state": "idle",
+            "rest_remaining_ms": None,
+        }
+    ]
+    assert "auth_token" not in snapshot.payload
+    assert "game_token" not in snapshot.payload
 
 
 def test_gameplay_route_rejects_payload_without_required_target():
@@ -143,3 +174,63 @@ def test_gameplay_route_rejects_payload_without_required_target():
         )
 
     assert raised.value.code.value == "invalid_field"
+
+
+def test_resync_route_rejects_payload_outside_the_approved_contract():
+    router = MessageRouter()
+    GameplayHandlers(object(), clock_ms=lambda: 1000).register_routes(router)
+
+    with pytest.raises(ProtocolError) as raised:
+        asyncio.run(
+            router.route(
+                RequestContext(
+                    "connection-1",
+                    envelope(
+                        "resync_request",
+                        {
+                            "auth_token": "auth",
+                            "game_token": "game-token",
+                        },
+                    ),
+                )
+            )
+        )
+
+    assert raised.value.code.value == "invalid_field"
+
+
+def test_resync_allows_authorized_colorless_room_spectator():
+    async def scenario():
+        session = build_game_session(
+            "game-1", Engine(), initial_sequence=0, request_cache_size=16
+        )
+        session.start()
+        sessions = GameSessionRegistry()
+        sessions.register(session)
+        router = MessageRouter()
+        GameplayHandlers(
+            GameplayCommandService(
+                Auth(), Tokens(role="SPECTATOR", color=None), sessions
+            ),
+            clock_ms=lambda: 1000,
+        ).register_routes(router)
+        result = await router.route(
+            RequestContext(
+                "connection-1",
+                envelope(
+                    "resync_request",
+                    {
+                        "auth_token": "auth",
+                        "game_token": "spectator-token",
+                        "game_id": "game-1",
+                    },
+                ),
+            )
+        )
+        await session.close()
+        return result
+
+    result = asyncio.run(scenario())
+
+    assert result.type == "snapshot"
+    assert result.payload["pieces"][0]["piece_id"] == 7

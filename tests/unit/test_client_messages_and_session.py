@@ -57,6 +57,8 @@ def test_authenticated_payloads_include_auth_and_normalize_room_codes():
         messages.room_join(token, "abc234"),
         messages.room_leave(token, "abc234"),
         messages.room_status(token, "abc234"),
+        messages.resync(token, "game-secret", "game-1"),
+        messages.lifecycle_status(token, "game-secret", "game-1"),
     )
 
     assert [item.type for item in requests] == [
@@ -69,9 +71,34 @@ def test_authenticated_payloads_include_auth_and_normalize_room_codes():
         "room_join",
         "room_leave",
         "room_status",
+        "resync_request",
+        "game_lifecycle_status",
     ]
     assert all(item.payload["auth_token"] == token for item in requests)
-    assert all(item.payload["code"] == "ABC234" for item in requests[-3:])
+    assert all(item.payload["code"] == "ABC234" for item in requests[6:9])
+    assert requests[-2].payload["game_token"] == "game-secret"
+    assert requests[-1].payload["game_id"] == "game-1"
+
+
+def test_gameplay_message_payloads_keep_existing_structured_contract():
+    messages = factory()
+
+    moved = messages.move(
+        "auth", "game-token", "game-1", 7, (6, 0), (4, 0)
+    )
+    jumped = messages.jump("auth", "game-token", "game-1", 7, (6, 0))
+
+    assert moved.type == "move_request"
+    assert moved.payload == {
+        "auth_token": "auth",
+        "game_token": "game-token",
+        "game_id": "game-1",
+        "piece_id": 7,
+        "expected_from": {"row": 6, "col": 0},
+        "target": {"row": 4, "col": 0},
+    }
+    assert jumped.type == "jump_request"
+    assert jumped.payload["target"] == jumped.payload["expected_from"]
 
 
 def test_client_session_stores_play_identity_and_redacts_tokens():
@@ -153,6 +180,14 @@ def test_client_session_tracks_player_and_spectator_rooms_then_clears():
 
     assert session.room.code == "ABC234"
     assert session.game.mode == "ROOM"
+    assert "room-token" not in repr(session)
+
+    status = dict(room)
+    status.update(status="ACTIVE", player_count=2, gameplay_started=True)
+    status.pop("game_token")
+    session.store_room(status)
+    assert session.room.status == "ACTIVE"
+    assert session.game.game_token == "room-token"
 
     spectator = dict(room)
     spectator.update(
@@ -165,7 +200,11 @@ def test_client_session_tracks_player_and_spectator_rooms_then_clears():
     spectator.pop("color")
     session.store_room(spectator)
     assert session.room.seat is None
+    assert session.room.color is None
     assert session.game.role == "SPECTATOR"
+    assert session.game.seat is None
+    assert session.game.color is None
+    assert "spectator-token" not in repr(session)
 
     session.clear_room()
     assert session.room is None and session.game is None

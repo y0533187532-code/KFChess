@@ -8,15 +8,26 @@ import uuid
 from websockets.asyncio.server import serve
 
 from ..protocol import MessageEnvelope, ProtocolError, ProtocolErrorCode
-from .routing import MessageRouter, RequestContext
+from .routing import MessageRouter, OutgoingMessage, RequestContext
 
 
 class WebSocketGateway:
-    def __init__(self, registry, router: MessageRouter, policy, *, logger=None):
+    def __init__(
+        self,
+        registry,
+        router: MessageRouter,
+        policy,
+        *,
+        game_connections=None,
+        logger=None,
+        on_connection_closed=None,
+    ):
         self._registry = registry
         self._router = router
         self._policy = policy
+        self._game_connections = game_connections
         self._logger = logger
+        self._on_connection_closed = on_connection_closed
         self._server = None
 
     async def handle(self, websocket) -> None:
@@ -27,7 +38,12 @@ class WebSocketGateway:
             async for raw in websocket:
                 await websocket.send(await self._response(raw, connection_id))
         finally:
+            binding = None
+            if self._game_connections is not None:
+                binding = self._game_connections.pop_connection(connection_id)
             await self._registry.remove(connection_id)
+            if binding is not None and self._on_connection_closed is not None:
+                await self._on_connection_closed(binding)
             self._log("connection_closed", connection_id=connection_id)
 
     async def start(self, host: str, port: int):
@@ -47,6 +63,33 @@ class WebSocketGateway:
         self._server.close()
         await self._server.wait_closed()
         self._server = None
+
+    async def push(self, connection_id: str, outgoing: OutgoingMessage) -> None:
+        websocket = await self._registry.get(connection_id)
+        if websocket is None:
+            return
+        envelope = self._make_envelope(
+            outgoing.type,
+            uuid.uuid4().hex,
+            dict(outgoing.payload),
+        )
+        try:
+            await websocket.send(envelope.to_json())
+        except Exception:
+            await self._registry.remove(connection_id)
+            if self._game_connections is not None:
+                self._game_connections.remove_connection(connection_id)
+
+    async def broadcast(
+        self, game_id: str, outgoing: OutgoingMessage, *, exclude=()
+    ) -> None:
+        if self._game_connections is None:
+            return
+        excluded = frozenset(exclude)
+        for connection_id in self._game_connections.connections_for(game_id):
+            if connection_id in excluded:
+                continue
+            await self.push(connection_id, outgoing)
 
     async def _response(self, raw, connection_id: str) -> str:
         request_id = self._best_effort_request_id(raw)

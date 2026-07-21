@@ -14,14 +14,19 @@ from .game_mode import GameMode, PlayerSeat
 
 
 class GameLifecycleRegistration:
-    def __init__(self, coordinator, *, room_repository=None):
+    def __init__(self, coordinator, *, room_repository=None, runtime_factory=None):
         self._context = coordinator
         self._rooms = room_repository
+        self._runtime_factory = runtime_factory
+
+    def _start_runtime(self, game_id: str) -> None:
+        if self._runtime_factory is not None:
+            self._runtime_factory.start(game_id)
 
     def register_play_match(self, match, *, now_ms: int | None = None):
         created_at_ms = match.created_at_ms if now_ms is None else now_ms
         players = tuple((seat.user_id, seat.seat) for seat in match.seats)
-        return self.register_game(
+        view = self.register_game(
             match.game_id,
             GameMode.PLAY,
             players,
@@ -29,6 +34,8 @@ class GameLifecycleRegistration:
             initial_state=GameLifecycleState.ACTIVE,
             now_ms=created_at_ms,
         )
+        self._start_runtime(match.game_id)
+        return view
 
     def register_room(
         self,
@@ -114,7 +121,9 @@ class GameLifecycleRegistration:
                 double_disconnect=False,
             ):
                 raise GameLifecycleError(ProtocolErrorCode.INVALID_GAME_STATE)
-            return self._context.views.create(self._context.require(game_id))
+            view = self._context.views.create(self._context.require(game_id))
+            self._start_runtime(game_id)
+            return view
 
     def add_room_player(
         self, game_id: str, user_id: int, seat: PlayerSeat, *, now_ms: int
@@ -163,4 +172,6 @@ class GameLifecycleRegistration:
                 double_disconnect=False,
             ):
                 raise GameLifecycleError(ProtocolErrorCode.INVALID_GAME_STATE)
-            return self._context.views.create(self._context.require(game_id))
+            view = self._context.views.create(self._context.require(game_id))
+            self._start_runtime(game_id)
+            return view

@@ -9,6 +9,7 @@ from .auth_service import AuthError
 from .game_session import SessionCommandType
 from .gameplay_service import (
     BoardCoordinate,
+    GameSnapshotRequest,
     GameplayError,
     GameplayRequest,
 )
@@ -25,29 +26,61 @@ class GameplayHandlers:
         "target",
     }
 
-    def __init__(self, gameplay_service, *, clock_ms):
+    def __init__(self, gameplay_service, *, clock_ms, game_connections=None):
         self._gameplay_service = gameplay_service
         self._clock_ms = clock_ms
+        self._game_connections = game_connections
 
     def register_routes(self, router) -> None:
         router.register(MessageType.MOVE_REQUEST.value, self.move)
         router.register(MessageType.JUMP_REQUEST.value, self.jump)
+        router.register(MessageType.RESYNC_REQUEST.value, self.resync)
 
     async def move(self, context) -> OutgoingMessage:
+        request = self._request(context)
         return await self._execute(
+            context,
             SessionCommandType.MOVE,
             context.envelope.request_id,
-            self._request(context),
+            request,
         )
 
     async def jump(self, context) -> OutgoingMessage:
+        request = self._request(context)
         return await self._execute(
+            context,
             SessionCommandType.JUMP,
             context.envelope.request_id,
-            self._request(context),
+            request,
         )
 
-    async def _execute(self, kind, request_id, request) -> OutgoingMessage:
+    async def resync(self, context) -> OutgoingMessage:
+        payload = context.envelope.payload
+        expected_fields = {"auth_token", "game_token", "game_id"}
+        if set(payload) != expected_fields:
+            raise self._invalid_payload()
+        request = GameSnapshotRequest(
+            auth_token=self._non_empty_string(payload.get("auth_token")),
+            game_token=self._non_empty_string(payload.get("game_token")),
+            game_id=self._non_empty_string(payload.get("game_id")),
+        )
+        try:
+            result = await self._gameplay_service.snapshot(
+                context.envelope.request_id,
+                request,
+                now_ms=self._clock_ms(),
+            )
+            self._bind_connection(context.connection_id, request)
+        except (AuthError, GameplayError) as exc:
+            return OutgoingMessage(
+                MessageType.COMMAND_RESULT.value,
+                {"accepted": False, "code": exc.code.value},
+            )
+        return OutgoingMessage(MessageType.SNAPSHOT.value, dict(result.payload))
+
+    async def _execute(
+        self, context, kind, request_id, request
+    ) -> OutgoingMessage:
         try:
             result = await self._gameplay_service.submit(
                 kind,
@@ -55,6 +88,8 @@ class GameplayHandlers:
                 request,
                 now_ms=self._clock_ms(),
             )
+            if result.accepted:
+                self._bind_connection(context.connection_id, request)
         except (AuthError, GameplayError) as exc:
             return OutgoingMessage(
                 MessageType.COMMAND_RESULT.value,
@@ -68,6 +103,19 @@ class GameplayHandlers:
                 "sequence": result.sequence,
                 **dict(result.payload),
             },
+        )
+
+    def _bind_connection(self, connection_id, request) -> None:
+        if self._game_connections is None:
+            return
+        principal = self._gameplay_service._auth_service.validate_auth_token(
+            request.auth_token,
+            now_ms=self._clock_ms(),
+        )
+        self._game_connections.bind(
+            connection_id,
+            request.game_id,
+            principal.user_id,
         )
 
     @classmethod

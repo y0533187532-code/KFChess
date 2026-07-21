@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from ..engine.reasons import MoveReason
-from ..protocol import ProtocolErrorCode
+from ..engine.types import GameSnapshot
+from ..protocol import ProtocolErrorCode, serialize_game_snapshot
+from .tick_scheduler import needs_advancement
 from .chess_compatibility import CHESS_SEAT_ADAPTER
 from .game_mode import GameRole, PlayerSeat, SeatBoundaryAdapter
 from .game_session import (
@@ -39,6 +41,13 @@ class GameplayRequest:
     target: BoardCoordinate
 
 
+@dataclass(frozen=True)
+class GameSnapshotRequest:
+    auth_token: str
+    game_token: str
+    game_id: str
+
+
 class GameSessionRegistry:
     """In-memory lookup for live authoritative game queues."""
 
@@ -55,6 +64,9 @@ class GameSessionRegistry:
 
     def remove(self, game_id: str) -> GameSession | None:
         return self._sessions.pop(game_id, None)
+
+    def game_ids(self) -> tuple[str, ...]:
+        return tuple(self._sessions)
 
     def pause(self, game_id: str) -> bool:
         session = self.get(game_id)
@@ -143,6 +155,41 @@ class GameplayCommandService:
             )
         return result
 
+    async def snapshot(
+        self,
+        request_id: str,
+        request: GameSnapshotRequest,
+        *,
+        now_ms: int,
+    ):
+        """Authorize and serialize an authoritative snapshot in FIFO order."""
+
+        principal = self._auth_service.validate_auth_token(
+            request.auth_token, now_ms=now_ms
+        )
+        game_token = self._token_service.verify_game(
+            request.game_token,
+            game_id=request.game_id,
+            now_ms=now_ms,
+        )
+        if game_token is None:
+            raise GameplayError(ProtocolErrorCode.INVALID_TOKEN)
+        if (
+            game_token.user_id != principal.user_id
+            or game_token.role
+            not in {GameRole.PLAYER.value, GameRole.SPECTATOR.value}
+        ):
+            raise GameplayError(ProtocolErrorCode.FORBIDDEN)
+        session = self._sessions.get(request.game_id)
+        if session is None:
+            raise GameplayError(ProtocolErrorCode.GAME_NOT_FOUND)
+        return await session.submit(
+            SessionCommand(
+                kind=SessionCommandType.SNAPSHOT.value,
+                request_id=request_id,
+            )
+        )
+
 
 class NetworkGameAdapter:
     """Inspect authoritative snapshots and invoke coordinate-based engine calls."""
@@ -167,9 +214,14 @@ class NetworkGameAdapter:
         engine,
         *,
         seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
+        tick_interval_ms: int = 50,
+        clock_ms=None,
     ):
         self._engine = engine
         self._seat_adapter = seat_adapter
+        self._tick_interval_ms = tick_interval_ms
+        self._clock_ms = clock_ms or (lambda: 0)
+        self._last_sync_wall_ms = self._clock_ms()
 
     @property
     def handlers(self):
@@ -177,7 +229,17 @@ class NetworkGameAdapter:
             {
                 SessionCommandType.MOVE.value: self.handle_move,
                 SessionCommandType.JUMP.value: self.handle_jump,
+                SessionCommandType.SNAPSHOT.value: self.handle_snapshot,
+                SessionCommandType.TICK.value: self.handle_tick,
             }
+        )
+
+    def handle_snapshot(self, _command: SessionCommand) -> HandlerResult:
+        return HandlerResult(
+            accepted=True,
+            changed=False,
+            code="ok",
+            payload=serialize_game_snapshot(self._engine.snapshot()),
         )
 
     def handle_move(self, command: SessionCommand) -> HandlerResult:
@@ -186,7 +248,38 @@ class NetworkGameAdapter:
     def handle_jump(self, command: SessionCommand) -> HandlerResult:
         return self._handle(command, jump=True)
 
+    def handle_tick(self, command: SessionCommand) -> HandlerResult:
+        if not needs_advancement(self._engine):
+            return HandlerResult(
+                accepted=True,
+                changed=False,
+                code="ok",
+            )
+        interval_ms = command.payload.get("interval_ms", self._tick_interval_ms)
+        before = self._engine.snapshot()
+        self._engine.wait(interval_ms)
+        self._last_sync_wall_ms = self._clock_ms()
+        after = self._engine.snapshot()
+        changed = _snapshot_changed(before, after)
+        payload = {}
+        if changed:
+            payload["snapshot"] = serialize_game_snapshot(after)
+        return HandlerResult(
+            accepted=True,
+            changed=changed,
+            code="ok",
+            payload=payload,
+        )
+
+    def _sync_elapsed_time(self) -> None:
+        now_ms = self._clock_ms()
+        elapsed = max(0, now_ms - self._last_sync_wall_ms)
+        if elapsed > 0:
+            self._engine.wait(elapsed)
+        self._last_sync_wall_ms = now_ms
+
     def _handle(self, command: SessionCommand, *, jump: bool) -> HandlerResult:
+        self._sync_elapsed_time()
         seat: PlayerSeat = command.payload["seat"]
         piece_id: int = command.payload["piece_id"]
         expected_from: BoardCoordinate = command.payload["expected_from"]
@@ -229,16 +322,39 @@ class NetworkGameAdapter:
         code = self._REASON_CODES.get(
             result.reason, ProtocolErrorCode.INVALID_FIELD.value
         )
+        payload = {"piece_id": piece_id}
+        if result.is_accepted:
+            payload["snapshot"] = serialize_game_snapshot(self._engine.snapshot())
         return HandlerResult(
             accepted=result.is_accepted,
             changed=result.is_accepted,
             code=code,
-            payload={"piece_id": piece_id},
+            payload=payload,
         )
 
     @staticmethod
     def _rejected(code: ProtocolErrorCode) -> HandlerResult:
         return HandlerResult(False, False, code.value)
+
+
+def _snapshot_changed(before: GameSnapshot, after: GameSnapshot) -> bool:
+    if before.game_over != after.game_over:
+        return True
+    if dict(before.score_by_color) != dict(after.score_by_color):
+        return True
+    if len(before.pieces) != len(after.pieces):
+        return True
+    before_pieces = tuple(
+        (piece.piece_id, piece.row, piece.col, piece.state, piece.rest_remaining_ms)
+        for piece in before.pieces
+    )
+    after_pieces = tuple(
+        (piece.piece_id, piece.row, piece.col, piece.state, piece.rest_remaining_ms)
+        for piece in after.pieces
+    )
+    if before_pieces != after_pieces:
+        return True
+    return before.active_motions != after.active_motions
 
 
 def build_game_session(
@@ -248,11 +364,20 @@ def build_game_session(
     initial_sequence: int,
     request_cache_size: int,
     seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
+    tick_interval_ms: int = 50,
+    clock_ms=None,
+    on_sequence_changed=None,
 ) -> GameSession:
-    adapter = NetworkGameAdapter(engine, seat_adapter=seat_adapter)
+    adapter = NetworkGameAdapter(
+        engine,
+        seat_adapter=seat_adapter,
+        tick_interval_ms=tick_interval_ms,
+        clock_ms=clock_ms,
+    )
     return GameSession(
         game_id,
         adapter.handlers,
         initial_sequence=initial_sequence,
         request_cache_size=request_cache_size,
+        on_sequence_changed=on_sequence_changed,
     )

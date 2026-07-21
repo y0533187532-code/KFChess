@@ -1,5 +1,6 @@
 import threading
 import time
+from queue import Queue
 from types import SimpleNamespace
 
 from kongfu_chess.client import (
@@ -42,12 +43,22 @@ class FakeTransport:
         self.fails = fails
         self.closed = False
         self.called = threading.Event()
+        self._incoming = Queue()
 
-    def request(self, request):
+    def send(self, request):
         self.called.set()
         if self.fails:
             raise OSError("secret details must not escape")
-        return request
+        self._incoming.put(request)
+
+    def receive(self, *, timeout=None):
+        if timeout is None:
+            return self._incoming.get()
+        return self._incoming.get(timeout=timeout)
+
+    def request(self, request):
+        self.send(request)
+        return self.receive()
 
     def close(self):
         self.closed = True
@@ -150,6 +161,7 @@ class FakeController:
         self.responses = []
         self.failures = []
         self.ticks = []
+        self.board_cells = []
 
     def handle_key(self, key):
         self.keys.append(key)
@@ -166,8 +178,17 @@ class FakeController:
     def handle_transport_failure(self, request_id, code):
         self.failures.append((request_id, code))
 
+    def disconnect_active_game(self):
+        return None
+
+    def handle_push(self, envelope):
+        return None
+
     def tick(self, now_ms):
         self.ticks.append(now_ms)
+
+    def handle_board_cell(self, row, col):
+        self.board_cells.append((row, col))
 
 
 class FakeNetwork:
@@ -228,6 +249,11 @@ def test_opencv_application_step_routes_network_clicks_and_frames(monkeypatch):
     app._clicks.register_click(10, 20)
     app.step()
     assert controller.actions == [UiAction.PLAY]
+
+    renderer.hit = UiHit("board_cell", (6, 4))
+    app._clicks.register_click(10, 20)
+    app.step()
+    assert controller.board_cells == [(6, 4)]
 
 
 def test_opencv_application_run_uses_only_opencv_event_loop(monkeypatch):

@@ -69,6 +69,21 @@ class GameTokenRepository:
             )
         return cursor.rowcount == 1
 
+    def begin_grace_for_user(
+        self, game_id: str, user_id: int, *, grace_expires_at_ms: int
+    ) -> bool:
+        with self._database.transaction() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE game_session_tokens
+                SET status = 'GRACE', grace_expires_at_ms = ?
+                WHERE game_id = ? AND user_id = ?
+                  AND status = 'ACTIVE' AND revoked_at_ms IS NULL
+                """,
+                (grace_expires_at_ms, game_id, user_id),
+            )
+        return cursor.rowcount == 1
+
     def revoke(self, token_hash: str, *, now_ms: int) -> bool:
         with self._database.transaction() as connection:
             cursor = connection.execute(

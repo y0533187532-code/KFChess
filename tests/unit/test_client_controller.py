@@ -7,7 +7,7 @@ from kongfu_chess.client import (
     ClientUiConstraints,
     UiAction,
 )
-from kongfu_chess.protocol import EnvelopePolicy, MessageEnvelope
+from kongfu_chess.protocol import EnvelopePolicy, MessageEnvelope, MessageType
 
 
 POLICY = EnvelopePolicy("1.0", 4096, 64, 64)
@@ -114,6 +114,89 @@ def enter_play_queue(controller, dispatcher):
         )
     )
     return join
+
+
+def room_payload(**overrides):
+    payload = {
+        "accepted": True,
+        "code": "ABC234",
+        "room_id": 2,
+        "game_id": "room-game",
+        "status": "WAITING",
+        "role": "PLAYER",
+        "seat": "FIRST_PLAYER",
+        "color": "w",
+        "game_token": "room-token",
+        "player_count": 1,
+        "spectator_count": 0,
+        "gameplay_started": False,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def snapshot_payload(**overrides):
+    payload = {
+        "board_width": 8,
+        "board_height": 8,
+        "game_over": False,
+        "selected": None,
+        "pieces": [
+            {
+                "row": 6,
+                "col": 0,
+                "token": "wP",
+                "piece_id": 7,
+                "state": "idle",
+                "rest_remaining_ms": None,
+            },
+            {
+                "row": 1,
+                "col": 0,
+                "token": "bP",
+                "piece_id": 8,
+                "state": "idle",
+                "rest_remaining_ms": None,
+            },
+        ],
+        "legal_destinations": [],
+        "score_by_color": {"w": 0, "b": 0},
+        "completed_moves": [],
+        "active_motions": [],
+        "elapsed_ms": 0,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def enter_active_play_game(controller, dispatcher):
+    authenticate(controller, dispatcher)
+    enter_play_queue(controller, dispatcher)
+    controller.tick(2000)
+    status = dispatcher.sent[-1]
+    controller.handle_response(
+        response(
+            status,
+            "play_match_found",
+            {
+                "accepted": True,
+                "code": "ok",
+                "state": "match_found",
+                "game_id": "game-1",
+                "game_token": "game-secret",
+                "role": "PLAYER",
+                "seat": "FIRST_PLAYER",
+                "color": "w",
+                "ranked": True,
+                "mode": "PLAY",
+            },
+        )
+    )
+    resync, lifecycle = dispatcher.sent[-2:]
+    assert resync.type == "resync_request"
+    assert lifecycle.type == "game_lifecycle_status"
+    controller.handle_response(response(resync, "snapshot", snapshot_payload()))
+    return lifecycle
 
 
 def test_login_validates_inline_masks_password_and_stores_session():
@@ -344,11 +427,62 @@ def test_play_status_error_is_localized_on_waiting_screen():
     assert controller.state.inline_message == "You are already waiting."
 
 
-def test_room_create_refresh_leave_and_join_code_validation():
+def test_room_create_stores_player_session_and_polls_status():
+    controller, dispatcher = make_controller(
+        localizer=ClientLocalizer(strings={"room_closed": "The room closed."})
+    )
+    authenticate(controller, dispatcher)
+    controller.tick(1000)
+    controller.handle_action(UiAction.ROOM)
+    assert controller.state.screen is ClientScreen.ROOM_ENTRY
+    controller.handle_action(UiAction.ROOM_CREATE)
+    create = dispatcher.sent[-1]
+    assert create.type == "room_create"
+    assert create.payload["auth_token"] == "auth-token"
+
+    controller.handle_response(response(create, "room_status", room_payload()))
+
+    assert controller.state.screen is ClientScreen.ROOM_LOBBY
+    assert controller.session.room.code == "ABC234"
+    assert controller.session.room.seat == "FIRST_PLAYER"
+    assert controller.session.room.color == "w"
+    assert controller.session.game.game_id == "room-game"
+    assert controller.session.game.mode == "ROOM"
+    assert "room-token" not in repr(controller.session)
+
+    count = len(dispatcher.sent)
+    controller.tick(1999)
+    assert len(dispatcher.sent) == count
+    controller.tick(2000)
+    status = dispatcher.sent[-1]
+    assert status.type == "room_status"
+    assert status.payload == {"auth_token": "auth-token", "code": "ABC234"}
+
+    refreshed = room_payload(
+        status="ACTIVE", player_count=2, gameplay_started=True
+    )
+    refreshed.pop("game_token")
+    controller.handle_response(response(status, "room_status", refreshed))
+    assert controller.session.room.status == "ACTIVE"
+    assert controller.session.game.game_token == "room-token"
+
+    controller.tick(3000)
+    next_status = dispatcher.sent[-1]
+    controller.handle_response(
+        response(
+            next_status,
+            "command_result",
+            {"accepted": False, "code": "room_closed"},
+        )
+    )
+    assert controller.state.screen is ClientScreen.ROOM_LOBBY
+    assert controller.state.inline_message == "The room closed."
+
+
+def test_room_join_code_validation_manual_status_and_leave():
     controller, dispatcher = make_controller()
     authenticate(controller, dispatcher)
     controller.handle_action(UiAction.ROOM)
-    assert controller.state.screen is ClientScreen.ROOM_ENTRY
     controller.state.fields["room_code"] = "bad"
     controller.handle_action(UiAction.ROOM_JOIN)
     assert controller.state.inline_message == "Enter a 6-character room code."
@@ -356,33 +490,52 @@ def test_room_create_refresh_leave_and_join_code_validation():
     controller.state.fields["room_code"] = "abc234"
     controller.handle_action(UiAction.ROOM_JOIN)
     request = dispatcher.sent[-1]
+    assert request.type == "room_join"
+    assert request.payload["auth_token"] == "auth-token"
     assert request.payload["code"] == "ABC234"
-    room_payload = {
-        "accepted": True,
-        "code": "ABC234",
-        "room_id": 2,
-        "game_id": "room-game",
-        "status": "WAITING",
-        "role": "PLAYER",
-        "seat": "FIRST_PLAYER",
-        "color": "w",
-        "game_token": "room-token",
-        "player_count": 1,
-        "spectator_count": 0,
-        "gameplay_started": False,
-    }
-    controller.handle_response(response(request, "room_status", room_payload))
+    controller.handle_response(response(request, "room_status", room_payload()))
     assert controller.state.screen is ClientScreen.ROOM_LOBBY
     assert controller.session.room.code == "ABC234"
 
     controller.handle_action(UiAction.ROOM_REFRESH)
     refresh = dispatcher.sent[-1]
     assert refresh.type == "room_status"
-    controller.handle_response(response(refresh, "room_status", room_payload))
+    controller.handle_response(response(refresh, "room_status", room_payload()))
     controller.handle_action(UiAction.ROOM_LEAVE)
     leave = dispatcher.sent[-1]
-    controller.handle_response(response(leave, "room_status", room_payload))
+    assert leave.type == "room_leave"
+    assert leave.payload == {"auth_token": "auth-token", "code": "ABC234"}
+    controller.handle_response(
+        response(leave, "room_status", room_payload(status="CLOSED"))
+    )
     assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.session.room is None
+    assert controller.session.game is None
+    count = len(dispatcher.sent)
+    controller.tick(5000)
+    assert len(dispatcher.sent) == count
+
+
+def test_room_join_error_is_localized_inside_room_entry_screen():
+    controller, dispatcher = make_controller(
+        localizer=ClientLocalizer(strings={"room_not_found": "Room not found."})
+    )
+    authenticate(controller, dispatcher)
+    controller.handle_action(UiAction.ROOM)
+    controller.state.fields["room_code"] = "ABC234"
+    controller.handle_action(UiAction.ROOM_JOIN)
+    join = dispatcher.sent[-1]
+
+    controller.handle_response(
+        response(
+            join,
+            "command_result",
+            {"accepted": False, "code": "room_not_found"},
+        )
+    )
+
+    assert controller.state.screen is ClientScreen.ROOM_ENTRY
+    assert controller.state.inline_message == "Room not found."
     assert controller.session.room is None
 
 
@@ -414,8 +567,10 @@ def test_room_keyboard_uppercases_alphanumeric_and_cancel_returns_to_menu():
     for character in "ab-c2345":
         controller.handle_key(ord(character))
     assert controller.state.fields["room_code"] == "ABC234"
+    sent = len(dispatcher.sent)
     controller.handle_action(UiAction.ROOM_CANCEL)
     assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert len(dispatcher.sent) == sent
 
 
 def test_logout_clears_client_session():
@@ -428,3 +583,222 @@ def test_logout_clears_client_session():
     )
     assert controller.state.screen is ClientScreen.LOGIN
     assert controller.session.authenticated is False
+
+
+def test_match_transitions_to_authoritative_board_and_polls_snapshot():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+    assert controller.state.game_snapshot.pieces[0].piece_id == 7
+    assert controller.state.game_lifecycle_state == "ACTIVE"
+    assert lifecycle.payload == {
+        "auth_token": "auth-token",
+        "game_token": "game-secret",
+        "game_id": "game-1",
+    }
+
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_lifecycle_status",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ACTIVE",
+            },
+        )
+    )
+    sent = len(dispatcher.sent)
+    controller.tick(2999)
+    assert len(dispatcher.sent) == sent
+    controller.tick(3000)
+    assert {item.type for item in dispatcher.sent[-2:]} == {
+        "resync_request",
+        "game_lifecycle_status",
+    }
+
+
+def test_board_clicks_dispatch_move_and_jump_then_refresh_immediately():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+
+    controller.handle_board_cell(6, 0)
+    assert controller.state.game_selected_cell == (6, 0)
+    controller.handle_board_cell(4, 0)
+    moved = dispatcher.sent[-1]
+    assert moved.type == "move_request"
+    assert moved.payload["piece_id"] == 7
+    assert moved.payload["expected_from"] == {"row": 6, "col": 0}
+    assert moved.payload["target"] == {"row": 4, "col": 0}
+
+    controller.handle_response(
+        response(
+            moved,
+            "command_result",
+            {
+                "accepted": True,
+                "code": "ok",
+                "sequence": 1,
+                "piece_id": 7,
+                "snapshot": snapshot_payload(),
+            },
+        )
+    )
+    assert controller.state.game_sequence == 1
+    assert controller.state.game_snapshot is not None
+    assert dispatcher.sent[-1] is moved
+
+    controller.handle_board_cell(6, 0)
+    controller.handle_board_cell(6, 0)
+    jumped = dispatcher.sent[-1]
+    assert jumped.type == "jump_request"
+    assert jumped.payload["target"] == jumped.payload["expected_from"]
+    controller.handle_response(
+        response(
+            jumped,
+            "command_result",
+            {
+                "accepted": True,
+                "code": "ok",
+                "sequence": 2,
+                "piece_id": 7,
+                "snapshot": snapshot_payload(),
+            },
+        )
+    )
+    assert dispatcher.sent[-1] is jumped
+
+
+def test_reconnect_countdown_blocks_commands_and_terminal_state_returns_to_menu():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.tick(4000)
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_lifecycle_status",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "PAUSED_FOR_RECONNECT",
+                "reconnect_deadline_ms": 23000,
+                "remaining_ms": 19000,
+            },
+        )
+    )
+
+    assert controller.state.reconnect_seconds_remaining == 19
+    sent = len(dispatcher.sent)
+    controller.handle_board_cell(6, 0)
+    assert len(dispatcher.sent) == sent
+    assert controller.state.inline_message == "game_paused"
+
+    controller.tick(5000)
+    terminal_status = dispatcher.sent[-1]
+    assert terminal_status.type == "game_lifecycle_status"
+    controller.handle_response(
+        response(
+            terminal_status,
+            "game_forfeit",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ENDED",
+                "winner_seat": "FIRST_PLAYER",
+                "reason": "forfeit",
+            },
+        )
+    )
+
+    assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.state.inline_message == "You won the game."
+    assert controller.session.game is None
+
+
+def test_active_room_spectator_receives_board_without_player_lifecycle_request():
+    controller, dispatcher = make_controller()
+    authenticate(controller, dispatcher)
+    controller.handle_action(UiAction.ROOM)
+    controller.state.fields["room_code"] = "ABC234"
+    controller.handle_action(UiAction.ROOM_JOIN)
+    joined = dispatcher.sent[-1]
+    payload = room_payload(
+        status="ACTIVE",
+        role="SPECTATOR",
+        seat=None,
+        color=None,
+        game_token="spectator-token",
+        player_count=2,
+        spectator_count=1,
+        gameplay_started=True,
+    )
+    controller.handle_response(response(joined, "room_status", payload))
+
+    resync = dispatcher.sent[-1]
+    assert resync.type == "resync_request"
+    assert all(
+        item.type != "game_lifecycle_status" for item in dispatcher.sent[-1:]
+    )
+    controller.handle_response(response(resync, "snapshot", snapshot_payload()))
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+    assert controller.session.game.seat is None
+    sent = len(dispatcher.sent)
+    controller.handle_board_cell(6, 0)
+    assert len(dispatcher.sent) == sent
+
+
+def test_unsolicited_state_update_updates_client_snapshot():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.STATE_UPDATE.value,
+                "request_id": "push-1",
+                "timestamp_ms": 1100,
+                "payload": {
+                    "game_id": "game-1",
+                    "sequence": 1,
+                    "snapshot": snapshot_payload(),
+                },
+            },
+            POLICY,
+        )
+    )
+
+    assert controller.state.game_sequence == 1
+    assert controller.state.game_snapshot is not None
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+
+
+def test_sequence_gap_triggers_resync():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    controller.state.game_sequence = 1
+    sent = len(dispatcher.sent)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.STATE_UPDATE.value,
+                "request_id": "push-2",
+                "timestamp_ms": 1100,
+                "payload": {
+                    "game_id": "game-1",
+                    "sequence": 3,
+                    "snapshot": snapshot_payload(),
+                },
+            },
+            POLICY,
+        )
+    )
+
+    assert len(dispatcher.sent) == sent + 1
+    assert dispatcher.sent[-1].type == "resync_request"

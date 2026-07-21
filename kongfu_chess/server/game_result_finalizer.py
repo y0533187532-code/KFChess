@@ -34,6 +34,7 @@ class GameResultFinalizer:
         *,
         room_repository=None,
         pause_session=None,
+        teardown_runtime=None,
         seat_adapter=CHESS_SEAT_ADAPTER,
     ):
         self._lifecycles = lifecycle_repository
@@ -44,6 +45,7 @@ class GameResultFinalizer:
         self._views = view_factory
         self._rooms = room_repository
         self._pause_session = pause_session or (lambda _game_id: None)
+        self._teardown_runtime = teardown_runtime or (lambda _game_id: None)
         self._seat_adapter = seat_adapter
 
     def outcome_for_color(self, color: str) -> MatchOutcome:
@@ -125,6 +127,7 @@ class GameResultFinalizer:
             return self._views.create(current, changed=False)
         self.revoke_tokens(record.game_id, now_ms=now_ms)
         self._pause_session(record.game_id)
+        self._teardown_runtime(record.game_id)
         self._update_room(record, state, reason=reason, now_ms=now_ms)
         return self._views.create(self._lifecycles.by_id(record.game_id))
 

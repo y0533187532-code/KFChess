@@ -57,6 +57,7 @@ from .game_lifecycle_service import GameLifecycleService, GameOverLifecycleSubsc
 from .game_lifecycle_handlers import GameLifecycleHandlers
 from .gameplay_service import (
     BoardCoordinate,
+    GameSnapshotRequest,
     GameplayCommandService,
     GameplayError,
     GameplayRequest,
@@ -64,6 +65,11 @@ from .gameplay_service import (
     NetworkGameAdapter,
     build_game_session,
 )
+from .game_connection_registry import GameConnectionRegistry
+from .game_runtime_factory import GameRuntimeFactory, standard_starting_board
+from .server_application import ServerStack, build_server_stack, run_from_config
+from .snapshot_push_service import SnapshotPushService
+from .tick_scheduler import TickScheduler, needs_advancement
 from .matchmaking_service import (
     MatchmakingError,
     MatchmakingService,
@@ -125,9 +131,12 @@ __all__ = [
     "GameplayHandlers",
     "GameplayRequest",
     "GameSessionRegistry",
+    "GameSnapshotRequest",
     "HandlerResult",
     "LifecyclePlayer",
+    "GameConnectionRegistry",
     "GameResultFinalizer",
+    "GameRuntimeFactory",
     "MessageRouter",
     "NetworkGameAdapter",
     "OutgoingMessage",
@@ -153,13 +162,20 @@ __all__ = [
     "RoomViewFactory",
     "ROOM_GAME_MODE",
     "RegisteredAccount",
+    "ServerStack",
     "build_auth_service",
     "build_game_session",
+    "build_server_stack",
+    "run_from_config",
     "SessionClosedError",
     "SessionCommand",
     "SessionCommandType",
     "SeatAssignment",
     "SeatAssignmentPolicy",
     "SeatBoundaryAdapter",
+    "SnapshotPushService",
+    "TickScheduler",
     "WebSocketGateway",
+    "needs_advancement",
+    "standard_starting_board",
 ]

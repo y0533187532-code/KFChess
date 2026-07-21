@@ -7,6 +7,14 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from ..config import CELL_SIZE_PX
+from ..graphics.game_view import GameView
+from ..graphics.layout.screen_layout import (
+    BACKGROUND_COLOR,
+    BOARD_X_PX,
+    BOARD_Y_PX,
+    HEADER_HEIGHT_PX,
+)
 from .ui_state import ClientScreen, UiAction
 
 
@@ -41,12 +49,42 @@ class OpenCvClientRenderer:
         "w": "chess_color_white",
         "b": "chess_color_black",
     }
+    _ROLE_TEXT = {
+        "PLAYER": "role_player",
+        "SPECTATOR": "role_spectator",
+    }
+    _SEAT_TEXT = {
+        "FIRST_PLAYER": "seat_first_player",
+        "SECOND_PLAYER": "seat_second_player",
+    }
+    _ROOM_STATUS_TEXT = {
+        "WAITING": "room_status_waiting",
+        "ACTIVE": "room_status_active",
+        "CLOSED": "room_status_closed",
+        "INTERRUPTED": "room_status_interrupted",
+        "ENDED": "room_status_ended",
+    }
+    _LIFECYCLE_TEXT = {
+        "CREATED": "game_state_created",
+        "WAITING_TO_START": "game_state_waiting",
+        "ACTIVE": "game_state_active",
+        "PAUSED_FOR_RECONNECT": "game_state_reconnecting",
+        "ENDED": "game_state_ended",
+        "CANCELLED": "game_state_cancelled",
+        "INTERRUPTED": "game_state_interrupted",
+    }
 
-    def __init__(self, localizer):
+    def __init__(self, localizer, *, game_view=None):
         self._text = localizer
+        self._game_view = game_view or GameView()
         self._targets: list[tuple[UiRect, UiHit]] = []
 
     def render(self, state, session) -> np.ndarray:
+        if (
+            state.screen is ClientScreen.GAME_BOARD
+            and state.game_snapshot is not None
+        ):
+            return self._game_board(state, session)
         frame = np.full(
             (self.HEIGHT, self.WIDTH, 3), self._BACKGROUND, dtype=np.uint8
         )
@@ -71,6 +109,94 @@ class OpenCvClientRenderer:
         if state.loading:
             self._label(
                 frame, self._text.text("loading"), 760, 55, 0.6, self._MUTED
+            )
+        return frame
+
+    def _game_board(self, state, session) -> np.ndarray:
+        rendered = self._game_view.render(state.game_snapshot)
+        frame = rendered.img
+        frame[:HEADER_HEIGHT_PX, :] = BACKGROUND_COLOR
+        self._targets = []
+        for row in range(state.game_snapshot.board_height):
+            for col in range(state.game_snapshot.board_width):
+                rectangle = UiRect(
+                    BOARD_X_PX + col * CELL_SIZE_PX,
+                    BOARD_Y_PX + row * CELL_SIZE_PX,
+                    CELL_SIZE_PX,
+                    CELL_SIZE_PX,
+                )
+                self._targets.append(
+                    (rectangle, UiHit("board_cell", (row, col)))
+                )
+
+        game = session.game
+        if game is not None:
+            identity = (
+                self._text.text("spectator")
+                if game.seat is None
+                else self._text.text(
+                    "seat_color",
+                    seat=self._display_seat(game.seat),
+                    color=self._display_chess_color(game.color),
+                )
+            )
+            self._label(
+                frame,
+                self._text.text("real_time_play"),
+                BOARD_X_PX,
+                30,
+                0.58,
+                (25, 25, 25, 255),
+            )
+            self._label(
+                frame,
+                identity,
+                BOARD_X_PX,
+                58,
+                0.48,
+                (25, 25, 25, 255),
+            )
+        lifecycle_key = self._LIFECYCLE_TEXT.get(
+            state.game_lifecycle_state or "", "game_state_waiting"
+        )
+        lifecycle_text = self._text.text(lifecycle_key)
+        if state.game_lifecycle_state == "PAUSED_FOR_RECONNECT":
+            seconds = state.reconnect_seconds_remaining
+            if seconds is not None:
+                lifecycle_text = self._text.text(
+                    "reconnect_countdown", seconds=seconds
+                )
+        self._label(
+            frame,
+            lifecycle_text,
+            BOARD_X_PX + 430,
+            30,
+            0.55,
+            (25, 25, 25, 255),
+        )
+        if state.game_selected_cell is not None:
+            row, col = state.game_selected_cell
+            cv2.rectangle(
+                frame,
+                (
+                    BOARD_X_PX + col * CELL_SIZE_PX,
+                    BOARD_Y_PX + row * CELL_SIZE_PX,
+                ),
+                (
+                    BOARD_X_PX + (col + 1) * CELL_SIZE_PX,
+                    BOARD_Y_PX + (row + 1) * CELL_SIZE_PX,
+                ),
+                (40, 190, 255, 255),
+                3,
+            )
+        if state.inline_message:
+            self._label(
+                frame,
+                state.inline_message,
+                BOARD_X_PX,
+                frame.shape[0] - 25,
+                0.5,
+                (40, 40, 230, 255),
             )
         return frame
 
@@ -171,12 +297,18 @@ class OpenCvClientRenderer:
         game = session.game
         if game is not None:
             self._label(frame, self._text.text("game_id", game_id=game.game_id), 270, 270, 0.52)
-            self._label(frame, self._text.text("role", role=game.role), 270, 315, 0.55)
+            self._label(
+                frame,
+                self._text.text("role", role=self._display_role(game.role)),
+                270,
+                315,
+                0.55,
+            )
             self._label(
                 frame,
                 self._text.text(
                     "seat_color",
-                    seat=game.seat,
+                    seat=self._display_seat(game.seat),
                     color=self._display_chess_color(game.color),
                 ),
                 270,
@@ -189,6 +321,20 @@ class OpenCvClientRenderer:
         if key is None:
             return color or ""
         return self._text.text(key)
+
+    def _display_role(self, role: str) -> str:
+        key = self._ROLE_TEXT.get(role)
+        return role if key is None else self._text.text(key)
+
+    def _display_seat(self, seat: str | None) -> str:
+        key = self._SEAT_TEXT.get(seat or "")
+        if key is None:
+            return seat or ""
+        return self._text.text(key)
+
+    def _display_room_status(self, status: str) -> str:
+        key = self._ROOM_STATUS_TEXT.get(status)
+        return status if key is None else self._text.text(key)
 
     def _room_entry(self, frame, state) -> None:
         self._panel(frame, UiRect(190, 115, 580, 410))
@@ -222,8 +368,10 @@ class OpenCvClientRenderer:
         self._label(frame, self._text.text("room_title"), 230, 150, 0.88)
         lines = (
             self._text.text("room_code_value", code=room.code),
-            self._text.text("room_status", status=room.status),
-            self._text.text("role", role=room.role),
+            self._text.text(
+                "room_status", status=self._display_room_status(room.status)
+            ),
+            self._text.text("role", role=self._display_role(room.role)),
             self._text.text("players", count=room.player_count),
             self._text.text("spectators", count=room.spectator_count),
         )
@@ -234,9 +382,22 @@ class OpenCvClientRenderer:
         ownership = (
             self._text.text("spectator")
             if room.seat is None
-            else self._text.text("seat_color", seat=room.seat, color=room.color)
+            else self._text.text(
+                "seat_color",
+                seat=self._display_seat(room.seat),
+                color=self._display_chess_color(room.color),
+            )
         )
         self._label(frame, ownership, 230, y + 5, 0.54, self._MUTED)
+        if room.status == "WAITING":
+            self._label(
+                frame,
+                self._text.text("waiting_for_opponent"),
+                230,
+                y + 43,
+                0.54,
+                self._MUTED,
+            )
         self._button(
             frame,
             self._text.text("refresh"),

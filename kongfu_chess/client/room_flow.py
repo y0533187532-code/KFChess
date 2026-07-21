@@ -16,8 +16,10 @@ class RoomFlow:
         UiAction.ROOM_LEAVE,
     }
 
-    def __init__(self, context):
+    def __init__(self, context, *, status_poll_interval_ms: int):
         self._context = context
+        self._status_poll_interval_ms = status_poll_interval_ms
+        self._next_status_poll_ms: int | None = None
 
     def handle_action(self, action: UiAction) -> bool:
         if action not in self._ACTIONS:
@@ -32,6 +34,7 @@ class RoomFlow:
         elif action is UiAction.ROOM_JOIN:
             self._submit_join()
         elif action is UiAction.ROOM_CANCEL:
+            self._stop_polling()
             self._context.show(ClientScreen.MAIN_MENU)
         elif action is UiAction.ROOM_REFRESH:
             self._submit_status()
@@ -39,18 +42,33 @@ class RoomFlow:
             self._submit_leave()
         return True
 
+    def tick(self, now_ms: int) -> None:
+        state = self._context.state
+        if (
+            state.screen in {ClientScreen.ROOM_LOBBY, ClientScreen.GAME_BOARD}
+            and not state.loading
+            and self._context.session.room is not None
+            and self._next_status_poll_ms is not None
+            and now_ms >= self._next_status_poll_ms
+        ):
+            self._submit_status()
+
     def handle_success(
         self, operation: str | None, message_type: str, payload
     ) -> bool:
         if message_type != MessageType.ROOM_STATUS.value:
             return False
         if operation == "room_leave":
+            self._stop_polling()
             self._context.session.clear_room()
             self._context.show(ClientScreen.MAIN_MENU)
             return True
+        board_was_active = self._context.state.screen is ClientScreen.GAME_BOARD
         self._context.session.store_room(payload)
         self._context.state.fields["room_code"] = self._context.session.room.code
-        self._context.show(ClientScreen.ROOM_LOBBY)
+        if not board_was_active:
+            self._context.show(ClientScreen.ROOM_LOBBY)
+        self._schedule_status_poll()
         return True
 
     def _submit_join(self) -> None:
@@ -71,6 +89,7 @@ class RoomFlow:
                 self._context.messages.room_status(self._auth_token(), room.code),
                 "room_status",
             )
+            self._schedule_status_poll()
 
     def _submit_leave(self) -> None:
         room = self._context.session.room
@@ -82,3 +101,11 @@ class RoomFlow:
 
     def _auth_token(self) -> str:
         return self._context.session.require_auth_token()
+
+    def _schedule_status_poll(self) -> None:
+        self._next_status_poll_ms = (
+            self._context.state.now_ms + self._status_poll_interval_ms
+        )
+
+    def _stop_polling(self) -> None:
+        self._next_status_poll_ms = None

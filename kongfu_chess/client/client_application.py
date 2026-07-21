@@ -1,3 +1,4 @@
+
 """Production OpenCV client shell for auth, menu, Play, and Room entry."""
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ class OpenCvClientApplication:
                 self.step()
                 key_code = cv2.waitKeyEx(16)
                 if key_code >= 0 and key_code & 0xFF == 27:
+                    self._controller.disconnect_active_game()
                     return
                 self._controller.handle_key(key_code)
         finally:
@@ -53,6 +55,9 @@ class OpenCvClientApplication:
 
     def step(self) -> None:
         for result in self._network.poll():
+            if result.kind == "push" and result.envelope is not None:
+                self._controller.handle_push(result.envelope)
+                continue
             if result.envelope is not None:
                 self._controller.handle_response(result.envelope)
             else:
@@ -67,6 +72,9 @@ class OpenCvClientApplication:
             if hit is not None:
                 if hit.kind == "field":
                     self._controller.activate_field(str(hit.value))
+                elif hit.kind == "board_cell":
+                    row, col = hit.value
+                    self._controller.handle_board_cell(row, col)
                 else:
                     self._controller.handle_action(hit.value)
         frame = self._renderer.render(
@@ -106,6 +114,8 @@ def build_opencv_client(
         worker,
         localizer,
         ClientUiConstraints.from_config(config),
+        snapshot_poll_interval_ms=1000,
+        active_snapshot_poll_interval_ms=200,
     )
     return OpenCvClientApplication(
         controller, OpenCvClientRenderer(localizer), worker
