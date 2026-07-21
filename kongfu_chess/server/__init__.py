@@ -38,6 +38,16 @@ from .game_mode import (
     SeatAssignmentPolicy,
     SeatBoundaryAdapter,
 )
+from .gameplay_handlers import GameplayHandlers
+from .gameplay_service import (
+    BoardCoordinate,
+    GameplayCommandService,
+    GameplayError,
+    GameplayRequest,
+    GameSessionRegistry,
+    NetworkGameAdapter,
+    build_game_session,
+)
 from .matchmaking_service import (
     MatchmakingError,
     MatchmakingService,
@@ -53,6 +63,7 @@ from .websocket_gateway import WebSocketGateway
 
 __all__ = [
     "CommandResult",
+    "BoardCoordinate",
     "ConnectionRegistry",
     "CHESS_SEAT_ADAPTER",
     "ChessColor",
@@ -75,8 +86,14 @@ __all__ = [
     "GameMode",
     "GameModeConfig",
     "GameRole",
+    "GameplayCommandService",
+    "GameplayError",
+    "GameplayHandlers",
+    "GameplayRequest",
+    "GameSessionRegistry",
     "HandlerResult",
     "MessageRouter",
+    "NetworkGameAdapter",
     "OutgoingMessage",
     "PasswordHasher",
     "PLAY_GAME_MODE",
@@ -89,6 +106,7 @@ __all__ = [
     "ROOM_GAME_MODE",
     "RegisteredAccount",
     "build_auth_service",
+    "build_game_session",
     "SessionClosedError",
     "SessionCommand",
     "SessionCommandType",

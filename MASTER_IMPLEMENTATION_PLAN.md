@@ -1,5 +1,7 @@
 # KFChess Client-Server Transition - Master Implementation Plan
 
+> **Superseding update (2026-07-21):** See `ARCHITECTURE_UPDATE_2026-07-21.md`. It resolves the gameplay-command gate, requires in-window OpenCV authentication for production, makes CLI authentication an optional disabled-by-default development fallback, and requires Windows/Linux/macOS portability. Older conflicting statements in this plan are obsolete.
+
 ## 1. Document Purpose
 
 This document defines the linear implementation roadmap for evolving KFChess from a local, single-process application into a decoupled client-server system with WebSocket communication, authenticated users, persistent ratings, rating-based matchmaking, private rooms, spectators, disconnect handling, and structured observability.

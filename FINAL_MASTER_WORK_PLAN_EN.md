@@ -1,5 +1,7 @@
 # Final Work Plan — Kung-Fu Chess Client–Server Transition
 
+> **Superseding update (2026-07-21):** See `ARCHITECTURE_UPDATE_2026-07-21.md`. It resolves the gameplay-command gate, requires in-window OpenCV authentication for production, makes CLI authentication an optional disabled-by-default development fallback, and requires Windows/Linux/macOS portability. Older conflicting statements in this plan are obsolete.
+
 > A binding implementation plan based on the manager’s specification, the existing project structure, and all 40 approved clarification answers.
 
 ## Delivery Status and Decision Gate

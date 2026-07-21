@@ -45,6 +45,17 @@ class ChessSeatAdapter:
     def protocol_color(self, seat: PlayerSeat) -> str:
         return self.color_for_player(seat).value
 
+    def seat_for_color(self, color: str) -> PlayerSeat:
+        try:
+            chess_color = ChessColor(color)
+            return next(
+                seat
+                for seat, mapped_color in self._COLORS_BY_SEAT.items()
+                if mapped_color is chess_color
+            )
+        except (StopIteration, ValueError) as exc:
+            raise ValueError("This chess color has no player-seat mapping") from exc
+
     def persistence_color(
         self, role: GameRole, seat: PlayerSeat | None
     ) -> str | None:

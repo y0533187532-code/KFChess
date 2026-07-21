@@ -68,6 +68,8 @@ class SeatBoundaryAdapter(Protocol):
 
     def protocol_color(self, seat: PlayerSeat) -> str: ...
 
+    def seat_for_color(self, color: str) -> PlayerSeat: ...
+
 
 class SeatAssignmentPolicy:
     """Assign players to the neutral seats declared by a game mode."""
