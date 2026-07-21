@@ -21,6 +21,16 @@ py -3.11 -m kongfu_chess.graphics.game_window
 
 Press `Esc` to close the window.
 
+Run the OpenCV network client for login, registration, Play matchmaking, and
+Room entry (with the configured server running):
+
+```powershell
+py -3.11 -m kongfu_chess.client
+```
+
+The production client keeps all forms, keyboard input, buttons, errors, and
+waiting states inside the Kung Fu Chess OpenCV window.
+
 Run a text script from PowerShell:
 
 ```powershell
