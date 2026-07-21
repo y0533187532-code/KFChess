@@ -5,7 +5,7 @@ from __future__ import annotations
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
 from .chess_compatibility import CHESS_SEAT_ADAPTER
-from .game_mode import SeatBoundaryAdapter
+from .game_mode import GameRole, SeatBoundaryAdapter
 from .matchmaking_service import MatchmakingError, MatchmakingStatus
 from .routing import OutgoingMessage
 
@@ -121,6 +121,8 @@ class MatchmakingHandlers:
                 "state": "match_found",
                 "game_id": match.game_id,
                 "game_token": match.game_token,
+                "role": GameRole.PLAYER.value,
+                "seat": match.seat.value,
                 "color": self._seat_adapter.protocol_color(match.seat),
                 "ranked": match.ranked,
                 "mode": match.mode,

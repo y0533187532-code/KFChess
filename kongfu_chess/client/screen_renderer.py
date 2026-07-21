@@ -37,6 +37,10 @@ class OpenCvClientRenderer:
     _ACCENT = (210, 138, 55)
     _ERROR = (90, 105, 245)
     _INPUT = (29, 34, 46)
+    _CHESS_COLOR_TEXT = {
+        "w": "chess_color_white",
+        "b": "chess_color_black",
+    }
 
     def __init__(self, localizer):
         self._text = localizer
@@ -135,13 +139,22 @@ class OpenCvClientRenderer:
         self._panel(frame, UiRect(220, 145, 520, 330))
         self._label(frame, self._text.text("matchmaking"), 280, 215, 0.82)
         self._label(frame, self._text.text("waiting"), 390, 280, 0.65, self._MUTED)
+        elapsed = state.queue_seconds_elapsed
+        if elapsed is not None:
+            self._label(
+                frame,
+                self._text.text("seconds_waiting", seconds=elapsed),
+                345,
+                315,
+                0.58,
+            )
         seconds = state.queue_seconds_remaining
         if seconds is not None:
             self._label(
                 frame,
                 self._text.text("seconds_remaining", seconds=seconds),
                 345,
-                325,
+                345,
                 0.58,
             )
         self._button(
@@ -161,11 +174,21 @@ class OpenCvClientRenderer:
             self._label(frame, self._text.text("role", role=game.role), 270, 315, 0.55)
             self._label(
                 frame,
-                self._text.text("seat_color", seat=game.seat, color=game.color),
+                self._text.text(
+                    "seat_color",
+                    seat=game.seat,
+                    color=self._display_chess_color(game.color),
+                ),
                 270,
                 360,
                 0.55,
             )
+
+    def _display_chess_color(self, color: str | None) -> str:
+        key = self._CHESS_COLOR_TEXT.get(color or "")
+        if key is None:
+            return color or ""
+        return self._text.text(key)
 
     def _room_entry(self, frame, state) -> None:
         self._panel(frame, UiRect(190, 115, 580, 410))

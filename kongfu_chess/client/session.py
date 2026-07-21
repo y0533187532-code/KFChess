@@ -34,8 +34,6 @@ class ClientRoomSession:
 class ClientSessionState:
     """Keep raw tokens internal and redact them from representations."""
 
-    _COLOR_TO_SEAT = {"w": "FIRST_PLAYER", "b": "SECOND_PLAYER"}
-
     def __init__(self):
         self.user_id: int | None = None
         self.username: str | None = None
@@ -69,14 +67,12 @@ class ClientSessionState:
         self.rating = int(payload["rating"])
 
     def store_play_match(self, payload: Mapping) -> None:
-        color = str(payload["color"])
-        seat = payload.get("seat", self._COLOR_TO_SEAT.get(color))
         self.game = ClientGameSession(
             game_id=str(payload["game_id"]),
             game_token=str(payload["game_token"]),
-            role=str(payload.get("role", "PLAYER")),
-            seat=None if seat is None else str(seat),
-            color=color,
+            role=str(payload["role"]),
+            seat=str(payload["seat"]),
+            color=str(payload["color"]),
             mode=str(payload.get("mode", "PLAY")),
             ranked=bool(payload.get("ranked", True)),
         )

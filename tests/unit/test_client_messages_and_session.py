@@ -89,6 +89,8 @@ def test_client_session_stores_play_identity_and_redacts_tokens():
         {
             "game_id": "game-1",
             "game_token": "raw-game-token",
+            "role": "PLAYER",
+            "seat": "FIRST_PLAYER",
             "color": "w",
             "ranked": True,
             "mode": "PLAY",

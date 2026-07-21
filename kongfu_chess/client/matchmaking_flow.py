@@ -53,9 +53,7 @@ class MatchmakingFlow:
 
     def handle_success(self, message_type: str, payload) -> bool:
         if message_type == MessageType.PLAY_MATCH_FOUND.value:
-            self._context.session.store_play_match(payload)
-            self._stop_polling()
-            self._context.show(ClientScreen.MATCH_FOUND)
+            self._store_match(payload)
             return True
         if message_type != MessageType.PLAY_QUEUE_STATUS.value:
             return False
@@ -66,17 +64,25 @@ class MatchmakingFlow:
         queue_state = str(payload.get("state", "idle"))
         if queue_state == "queued":
             self._context.state.screen = ClientScreen.PLAY_QUEUE
+            self._context.state.queue_enqueued_at_ms = int(
+                payload["enqueued_at_ms"]
+            )
             self._context.state.queue_expires_at_ms = int(payload["expires_at_ms"])
             self._next_status_poll_ms = (
                 self._context.state.now_ms + self._status_poll_interval_ms
             )
         elif queue_state == "match_found":
-            self._context.session.store_play_match(payload)
-            self._context.show(ClientScreen.MATCH_FOUND)
+            self._store_match(payload)
         else:
             self._stop_polling()
             self._context.show(ClientScreen.MAIN_MENU)
 
     def _stop_polling(self) -> None:
+        self._context.state.queue_enqueued_at_ms = None
         self._context.state.queue_expires_at_ms = None
         self._next_status_poll_ms = None
+
+    def _store_match(self, payload) -> None:
+        self._context.session.store_play_match(payload)
+        self._stop_polling()
+        self._context.show(ClientScreen.MATCH_FOUND)

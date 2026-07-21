@@ -63,6 +63,7 @@ class ClientUiState:
     active_field: str | None = None
     inline_message: str | None = None
     loading: bool = False
+    queue_enqueued_at_ms: int | None = None
     queue_expires_at_ms: int | None = None
     now_ms: int = 0
 
@@ -76,3 +77,9 @@ class ClientUiState:
             return None
         remaining = max(0, self.queue_expires_at_ms - self.now_ms)
         return (remaining + 999) // 1000
+
+    @property
+    def queue_seconds_elapsed(self) -> int | None:
+        if self.queue_enqueued_at_ms is None:
+            return None
+        return max(0, self.now_ms - self.queue_enqueued_at_ms) // 1000

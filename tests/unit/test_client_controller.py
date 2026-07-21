@@ -94,6 +94,28 @@ def authenticate(controller, dispatcher):
     accept_validation(controller, validation)
 
 
+def enter_play_queue(controller, dispatcher):
+    controller.tick(1000)
+    controller.handle_action(UiAction.PLAY)
+    join = dispatcher.sent[-1]
+    controller.handle_response(
+        response(
+            join,
+            "play_queue_status",
+            {
+                "accepted": True,
+                "code": "ok",
+                "state": "queued",
+                "user_id": 7,
+                "rating": 1200,
+                "enqueued_at_ms": 1000,
+                "expires_at_ms": 61000,
+            },
+        )
+    )
+    return join
+
+
 def test_login_validates_inline_masks_password_and_stores_session():
     controller, dispatcher = make_controller()
     controller.state.fields.update(username="x", password="short")
@@ -217,28 +239,14 @@ def test_auth_error_and_transport_failure_clear_password_and_show_inline_error()
     assert controller.state.loading is False
 
 
-def test_play_queue_polls_cancels_times_out_and_stores_match_identity():
+def test_play_queue_polls_times_out_and_stores_match_identity():
     controller, dispatcher = make_controller()
     authenticate(controller, dispatcher)
-    controller.tick(1000)
-    controller.handle_action(UiAction.PLAY)
-    join = dispatcher.sent[-1]
-    controller.handle_response(
-        response(
-            join,
-            "play_queue_status",
-            {
-                "accepted": True,
-                "code": "ok",
-                "state": "queued",
-                "user_id": 7,
-                "rating": 1200,
-                "enqueued_at_ms": 1000,
-                "expires_at_ms": 61000,
-            },
-        )
-    )
+    join = enter_play_queue(controller, dispatcher)
+    assert join.type == "play_queue_join"
+    assert join.payload["auth_token"] == "auth-token"
     assert controller.state.screen is ClientScreen.PLAY_QUEUE
+    assert controller.state.queue_seconds_elapsed == 0
     assert controller.state.queue_seconds_remaining == 60
 
     count = len(dispatcher.sent)
@@ -257,6 +265,8 @@ def test_play_queue_polls_cancels_times_out_and_stores_match_identity():
                 "state": "match_found",
                 "game_id": "game-1",
                 "game_token": "game-secret",
+                "role": "PLAYER",
+                "seat": "SECOND_PLAYER",
                 "color": "b",
                 "ranked": True,
                 "mode": "PLAY",
@@ -265,6 +275,11 @@ def test_play_queue_polls_cancels_times_out_and_stores_match_identity():
     )
     assert controller.state.screen is ClientScreen.MATCH_FOUND
     assert controller.session.game.seat == "SECOND_PLAYER"
+    assert controller.session.game.role == "PLAYER"
+    assert controller.session.game.color == "b"
+    assert "game-secret" not in repr(controller.session)
+    assert controller.state.queue_seconds_elapsed is None
+    assert controller.state.queue_seconds_remaining is None
 
     controller.state.screen = ClientScreen.MAIN_MENU
     controller.handle_action(UiAction.PLAY)
@@ -282,14 +297,18 @@ def test_play_queue_polls_cancels_times_out_and_stores_match_identity():
     )
     assert controller.state.screen is ClientScreen.MAIN_MENU
     assert controller.state.inline_message == "matchmaking_timeout"
+    assert controller.state.queue_seconds_elapsed is None
+    assert controller.state.queue_seconds_remaining is None
 
 
 def test_play_cancel_returns_to_main_menu():
     controller, dispatcher = make_controller()
     authenticate(controller, dispatcher)
-    controller.state.screen = ClientScreen.PLAY_QUEUE
+    enter_play_queue(controller, dispatcher)
     controller.handle_action(UiAction.PLAY_CANCEL)
     request = dispatcher.sent[-1]
+    assert request.type == "play_queue_cancel"
+    assert request.payload["auth_token"] == "auth-token"
     controller.handle_response(
         response(
             request,
@@ -298,6 +317,31 @@ def test_play_cancel_returns_to_main_menu():
         )
     )
     assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.state.queue_seconds_elapsed is None
+    assert controller.state.queue_seconds_remaining is None
+
+
+def test_play_status_error_is_localized_on_waiting_screen():
+    controller, dispatcher = make_controller(
+        localizer=ClientLocalizer(
+            strings={"already_in_matchmaking": "You are already waiting."}
+        )
+    )
+    authenticate(controller, dispatcher)
+    enter_play_queue(controller, dispatcher)
+    controller.tick(2000)
+    status_request = dispatcher.sent[-1]
+
+    controller.handle_response(
+        response(
+            status_request,
+            "command_result",
+            {"accepted": False, "code": "already_in_matchmaking"},
+        )
+    )
+
+    assert controller.state.screen is ClientScreen.PLAY_QUEUE
+    assert controller.state.inline_message == "You are already waiting."
 
 
 def test_room_create_refresh_leave_and_join_code_validation():

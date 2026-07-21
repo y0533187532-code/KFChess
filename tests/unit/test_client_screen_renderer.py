@@ -68,23 +68,35 @@ def test_renderer_covers_registration_and_main_menu_screens():
     assert renderer.hit_test(400, 455).value is UiAction.LOGOUT
 
 
-def test_renderer_covers_queue_and_match_found_without_drawing_tokens():
+def test_renderer_covers_queue_and_match_found_without_drawing_tokens(monkeypatch):
     renderer = OpenCvClientRenderer(ClientLocalizer())
     session = authenticated_session()
+    rendered_text = []
+    monkeypatch.setattr(
+        "kongfu_chess.client.screen_renderer.cv2.putText",
+        lambda _frame, value, *_args: rendered_text.append(str(value)),
+    )
     state = ClientUiState(
         screen=ClientScreen.PLAY_QUEUE,
+        queue_enqueued_at_ms=1000,
         queue_expires_at_ms=62000,
         now_ms=2000,
     )
     queue = renderer.render(state, session)
     assert queue.any()
+    assert state.queue_seconds_elapsed == 1
     assert state.queue_seconds_remaining == 60
+    assert "Waiting..." in rendered_text
+    assert "Waiting time: 1s" in rendered_text
     assert renderer.hit_test(400, 390).value is UiAction.PLAY_CANCEL
 
+    rendered_text.clear()
     session.store_play_match(
         {
             "game_id": "game-1",
             "game_token": "never-render-this-game-token",
+            "role": "PLAYER",
+            "seat": "FIRST_PLAYER",
             "color": "w",
             "mode": "PLAY",
             "ranked": True,
@@ -93,6 +105,9 @@ def test_renderer_covers_queue_and_match_found_without_drawing_tokens():
     state.screen = ClientScreen.MATCH_FOUND
     found = renderer.render(state, session)
     assert found.any()
+    assert "Role: PLAYER" in rendered_text
+    assert "Seat: FIRST_PLAYER / Color: White" in rendered_text
+    assert all("never-render" not in value for value in rendered_text)
     assert "never-render" not in repr(session)
 
 

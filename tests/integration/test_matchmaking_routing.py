@@ -100,6 +100,9 @@ def test_join_and_status_route_each_players_own_match_token(tmp_path):
     assert joining_found.type == waiting_found.type == "play_match_found"
     assert joining_found.payload["game_id"] == waiting_found.payload["game_id"]
     assert joining_found.payload["game_token"] != waiting_found.payload["game_token"]
+    assert joining_found.payload["role"] == waiting_found.payload["role"] == "PLAYER"
+    assert joining_found.payload["seat"] == "SECOND_PLAYER"
+    assert waiting_found.payload["seat"] == "FIRST_PLAYER"
     assert joining_found.payload["color"] == "b"
     assert waiting_found.payload["color"] == "w"
     assert joining_found.payload["ranked"] is True
