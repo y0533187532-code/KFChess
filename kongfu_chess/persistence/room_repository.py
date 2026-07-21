@@ -199,6 +199,18 @@ class RoomRepository:
                 """,
                 (now_ms,),
             ).rowcount
+            connection.execute(
+                """
+                UPDATE room_members SET left_at_ms = ?
+                WHERE left_at_ms IS NULL
+                  AND room_id IN (
+                      SELECT id FROM rooms
+                      WHERE status IN ('CLOSED', 'INTERRUPTED')
+                        AND close_reason = 'server_restart'
+                  )
+                """,
+                (now_ms,),
+            )
         return interrupted, closed
 
     def _transition(self, room_id: int, current: str, target: str) -> bool:

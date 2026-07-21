@@ -46,6 +46,7 @@ class OpenCvClientApplication:
                 self.step()
                 key_code = cv2.waitKeyEx(16)
                 if key_code >= 0 and key_code & 0xFF == 27:
+                    self._controller.leave_active_room()
                     self._controller.disconnect_active_game()
                     return
                 self._controller.handle_key(key_code)

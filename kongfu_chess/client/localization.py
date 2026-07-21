@@ -49,6 +49,7 @@ ENGLISH_CLIENT_TEXT = {
     "chess_color_white": "White",
     "chess_color_black": "Black",
     "spectator": "Spectator (no player color)",
+    "spectator_read_only": "Spectator mode — view only",
     "players": "Players: {count}",
     "spectators": "Spectators: {count}",
     "refresh": "Refresh",

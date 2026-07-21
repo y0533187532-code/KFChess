@@ -18,7 +18,7 @@ from ..persistence import (
     TokenService,
     UserRepository,
 )
-from ..protocol import EnvelopePolicy
+from ..protocol import EnvelopePolicy, serialize_game_snapshot
 from .auth_handlers import AuthHandlers
 from .auth_service import AuthService
 from .connections import ConnectionRegistry
@@ -55,6 +55,7 @@ class ServerStack:
     runtime_factory: GameRuntimeFactory
     gateway: WebSocketGateway
     router: MessageRouter
+    game_connections: GameConnectionRegistry
     lifecycle_push: LifecyclePushService | None = None
     _expiry_task: asyncio.Task | None = field(default=None, repr=False)
 
@@ -218,12 +219,20 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         config,
         lifecycle_service=lifecycle,
     )
+    def snapshot_provider(game_id: str):
+        engine = runtime_factory.engine_for(game_id)
+        if engine is None:
+            return None
+        return serialize_game_snapshot(engine.snapshot())
+
     rooms = RoomsService.from_config(
         auth,
         tokens,
         rooms_repo,
         config,
         lifecycle_service=lifecycle,
+        snapshot_provider=snapshot_provider,
+        active_game_checker=lifecycle.user_in_active_game,
     )
     gameplay = GameplayCommandService(
         auth,
@@ -247,6 +256,10 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         game_connections=game_connections,
     ).register_routes(router)
 
+    now_ms = _clock_ms()
+    rooms.recover_after_restart(now_ms=now_ms)
+    lifecycle.recover_after_restart(now_ms=now_ms)
+
     return ServerStack(
         config=config,
         database=database,
@@ -256,6 +269,7 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         runtime_factory=runtime_factory,
         gateway=gateway,
         router=router,
+        game_connections=game_connections,
         lifecycle_push=lifecycle_push,
     )
 

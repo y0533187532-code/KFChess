@@ -132,13 +132,15 @@ class OpenCvClientRenderer:
         game = session.game
         if game is not None:
             identity = (
-                self._text.text("spectator")
-                if game.seat is None
+                self._text.text("spectator_read_only")
+                if game.role == "SPECTATOR"
                 else self._text.text(
                     "seat_color",
                     seat=self._display_seat(game.seat),
                     color=self._display_chess_color(game.color),
                 )
+                if game.seat is not None
+                else self._text.text("spectator")
             )
             self._label(
                 frame,

@@ -61,6 +61,28 @@ class GameplayFlow:
         if game.role == "PLAYER":
             self._submit_lifecycle_status()
 
+    def bootstrap_room_snapshot(self, payload) -> None:
+        if payload.get("role") != "SPECTATOR":
+            return
+        snapshot_payload = payload.get("snapshot")
+        if snapshot_payload is None:
+            return
+        game = self._context.session.game
+        if game is None:
+            return
+        try:
+            snapshot = deserialize_game_snapshot(snapshot_payload)
+        except GameSnapshotPayloadError:
+            return
+        self._game_id = game.game_id
+        state = self._context.state
+        state.game_snapshot = snapshot
+        state.game_lifecycle_state = "ACTIVE"
+        state.screen = ClientScreen.GAME_BOARD
+        if "sequence" in snapshot_payload:
+            state.game_sequence = int(snapshot_payload["sequence"])
+        self._schedule_snapshot_poll()
+
     def tick(self, now_ms: int) -> None:
         if self._game_id is None:
             return
@@ -248,6 +270,9 @@ class GameplayFlow:
             )
         except OSError:
             return
+
+    def stop_room_runtime(self) -> None:
+        self._stop()
 
     def _apply_state_update(self, payload, *, from_push: bool) -> bool:
         sequence = payload.get("sequence")

@@ -88,6 +88,22 @@ class GameLifecycleRepository:
             ).fetchone()
         return None if row is None else _lifecycle_record(row)
 
+    def user_in_live_game(self, user_id: int) -> bool:
+        with self._database.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT 1
+                FROM game_lifecycle_players player
+                JOIN game_lifecycles lifecycle
+                  ON lifecycle.game_id = player.game_id
+                WHERE player.user_id = ?
+                  AND lifecycle.state NOT IN ('ENDED', 'CANCELLED', 'INTERRUPTED')
+                LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone()
+        return row is not None
+
     def players(self, game_id: str) -> tuple[GameLifecyclePlayerRecord, ...]:
         with self._database.transaction() as connection:
             rows = connection.execute(

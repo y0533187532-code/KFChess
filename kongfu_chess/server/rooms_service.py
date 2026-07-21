@@ -153,6 +153,7 @@ class RoomsService:
                     assignment.seat,
                     now_ms=now_ms,
                 )
+                room = self._maybe_start_room_game(room, now_ms=now_ms)
         else:
             spectator_count = sum(
                 member.role == GameRole.SPECTATOR.value for member in members
@@ -279,3 +280,15 @@ class RoomsService:
         if member is None:
             raise RoomsError(ProtocolErrorCode.UNAUTHORIZED)
         return member
+
+    def _maybe_start_room_game(self, room, *, now_ms: int):
+        if self._lifecycle_service is None:
+            return room
+        player_count = sum(
+            member.role == GameRole.PLAYER.value
+            for member in self._rooms.active_members(room.id)
+        )
+        if player_count < 2 or room.started_at_ms is not None:
+            return room
+        self._lifecycle_service.start_room_game(room.game_id, now_ms=now_ms)
+        return self._rooms.by_id(room.id)

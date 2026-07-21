@@ -66,7 +66,11 @@ class RoomFlow:
         board_was_active = self._context.state.screen is ClientScreen.GAME_BOARD
         self._context.session.store_room(payload)
         self._context.state.fields["room_code"] = self._context.session.room.code
-        if not board_was_active:
+        if (
+            not board_was_active
+            and self._context.session.room is not None
+            and not self._context.session.room.gameplay_started
+        ):
             self._context.show(ClientScreen.ROOM_LOBBY)
         self._schedule_status_poll()
         return True

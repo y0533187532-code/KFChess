@@ -337,7 +337,7 @@ def test_restart_recovery_interrupts_active_revokes_game_tokens_not_auth(tmp_pat
     assert users.by_id(game["first_id"]).rating == 1200
 
 
-def test_matchmaking_registers_active_play_and_room_start_is_explicit(tmp_path):
+def test_matchmaking_registers_active_play_and_room_auto_starts_on_join(tmp_path):
     values = system(tmp_path)
     _, _, tokens, auth, repo, rooms_repo, lifecycle, _ = values
     _, first = player(auth, "PlayOne")
@@ -369,22 +369,18 @@ def test_matchmaking_registers_active_play_and_room_start_is_explicit(tmp_path):
         lifecycle_service=lifecycle,
     )
     created = rooms.create(creator, now_ms=2100)
-    rooms.join(opponent, created.code, now_ms=2101)
-    assert repo.by_id("room-game").state == "WAITING_TO_START"
-    assert rooms_repo.by_id(created.room_id).started_at_ms is None
+    joined = rooms.join(opponent, created.code, now_ms=2101)
 
-    started = lifecycle.start_room_game("room-game", now_ms=2102)
-
-    assert started.state is GameLifecycleState.ACTIVE
-    assert rooms_repo.by_id(created.room_id).started_at_ms == 2102
+    assert repo.by_id("room-game").state == "ACTIVE"
+    assert rooms_repo.by_id(created.room_id).started_at_ms == 2101
+    assert joined.gameplay_started is True
 
 
-def test_room_prestart_opponent_departure_releases_lifecycle_seat(tmp_path):
+def test_room_opponent_leave_after_start_is_deferred(tmp_path):
     values = system(tmp_path)
     _, _, tokens, auth, repo, rooms_repo, lifecycle, _ = values
     _, creator = player(auth, "RoomOne")
     _, opponent = player(auth, "RoomTwo", now_ms=1100)
-    replacement_id, replacement = player(auth, "RoomThree", now_ms=1200)
     rooms = RoomsService(
         auth,
         tokens,
@@ -396,18 +392,12 @@ def test_room_prestart_opponent_departure_releases_lifecycle_seat(tmp_path):
         lifecycle_service=lifecycle,
     )
     created = rooms.create(creator, now_ms=2000)
-    rooms.join(opponent, created.code, now_ms=2001)
+    joined = rooms.join(opponent, created.code, now_ms=2001)
+    assert joined.gameplay_started is True
+    assert repo.by_id("room-game").state == "ACTIVE"
 
-    rooms.leave(opponent, created.code, now_ms=2002)
-    joined = rooms.join(replacement, created.code, now_ms=2003)
-
-    assert joined.seat is PlayerSeat.SECOND_PLAYER
-    second = next(
-        item
-        for item in repo.players("room-game")
-        if item.seat == PlayerSeat.SECOND_PLAYER.value
-    )
-    assert second.user_id == replacement_id
+    left = rooms.leave(opponent, created.code, now_ms=2002)
+    assert left.leave_deferred is True
 
 
 def test_technical_draw_uses_elo_draw_and_is_idempotent(tmp_path):

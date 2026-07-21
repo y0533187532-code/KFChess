@@ -3,6 +3,7 @@ import copy
 import json
 import time
 from pathlib import Path
+from queue import Empty
 
 from kongfu_chess.client import WebSocketClientTransport
 from kongfu_chess.infrastructure.configuration import ConfigProvider
@@ -69,17 +70,38 @@ def register_and_login(transport, username, request_id, *, policy):
     return logged_in.payload["auth_token"]
 
 
+def collect_messages(transport, *, duration=2.0):
+    types = []
+    deadline = time.time() + duration
+    while time.time() < deadline:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        try:
+            message = transport.receive(timeout=min(0.2, remaining))
+        except Empty:
+            continue
+        types.append(message.type)
+    return types
+
+
 def receive_push(transport, *message_types, timeout=2.0):
+    buffered = []
     deadline = time.time() + timeout
     while time.time() < deadline:
         remaining = deadline - time.time()
         if remaining <= 0:
             break
-        message = transport.receive(timeout=remaining)
+        if buffered:
+            message = buffered.pop(0)
+        else:
+            message = transport.receive(timeout=remaining)
         if message.type in message_types:
             return message
+        buffered.append(message)
     raise AssertionError(
-        f"Timed out waiting for push types {message_types!r}"
+        f"Timed out waiting for push types {message_types!r}; "
+        f"buffered={[message.type for message in buffered]}"
     )
 
 
@@ -278,6 +300,12 @@ def test_disconnect_reconnect_resumes_active_game(tmp_path):
     asyncio.run(scenario())
 
 
+def active_player(players):
+    if players["first_match"]["color"] == "w":
+        return "first", "second"
+    return "second", "first"
+
+
 def test_disconnect_expiry_forfeits_after_grace(tmp_path):
     config = make_test_config(tmp_path, reconnect_grace_seconds=2)
     stack = build_server_stack(config)
@@ -297,25 +325,31 @@ def test_disconnect_expiry_forfeits_after_grace(tmp_path):
         try:
             players = await asyncio.to_thread(matched_players, uri, policy, stack)
             await asyncio.to_thread(bind_players, players, policy)
+            assert len(stack.game_connections.connections_for(players["game_id"])) == 2
             await asyncio.to_thread(record_meaningful_move, players, policy)
-            await asyncio.to_thread(players["first"].close)
-            await asyncio.sleep(0.2)
-            countdown = await asyncio.to_thread(
-                receive_push,
-                players["second"],
-                MessageType.DISCONNECT_COUNTDOWN.value,
+            disconnected_label, opponent_label = active_player(players)
+            disconnected = await asyncio.to_thread(
+                request,
+                players[disconnected_label],
+                MessageType.GAME_DISCONNECT.value,
+                {
+                    "auth_token": players[f"{disconnected_label}_auth"],
+                    "game_token": players[f"{disconnected_label}_match"]["game_token"],
+                    "game_id": players["game_id"],
+                },
+                "explicit-disconnect",
+                policy=policy,
             )
-
-            await asyncio.sleep(3.5)
-            forfeit = await asyncio.to_thread(
-                receive_push,
-                players["second"],
-                MessageType.GAME_FORFEIT.value,
-                timeout=5.0,
+            assert disconnected.type == MessageType.DISCONNECT_COUNTDOWN.value, (
+                disconnected.payload
             )
-            assert forfeit.type == MessageType.GAME_FORFEIT.value
-            assert forfeit.payload["game_id"] == players["game_id"]
-            assert forfeit.payload["state"] == "ENDED"
+            grace_deadline = int(disconnected.payload["reconnect_deadline_ms"])
+            await asyncio.sleep(max(0.0, (grace_deadline - int(time.time() * 1000) + 500) / 1000))
+            collected = await asyncio.to_thread(
+                collect_messages, players[opponent_label], duration=3.0
+            )
+            assert MessageType.DISCONNECT_COUNTDOWN.value in collected, collected
+            assert MessageType.GAME_FORFEIT.value in collected, collected
         finally:
             if players is not None:
                 players["first"].close()

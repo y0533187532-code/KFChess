@@ -268,6 +268,9 @@ class GameLifecycleService:
     def record_accepted_command(self, game_id: str, user_id: int) -> bool:
         return self._reconnect_workflow.record_accepted_command(game_id, user_id)
 
+    def user_in_active_game(self, user_id: int) -> bool:
+        return self._lifecycles.user_in_live_game(user_id)
+
     def expire(
         self, *, now_ms: int, game_id: str | None = None
     ) -> tuple[GameLifecycleView, ...]:

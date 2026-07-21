@@ -181,6 +181,9 @@ class FakeController:
     def disconnect_active_game(self):
         return None
 
+    def leave_active_room(self):
+        return None
+
     def handle_push(self, envelope):
         return None
 

@@ -136,6 +136,7 @@ class ClientController:
             self._gameplay.activate_if_ready()
             return
         if self._rooms.handle_success(operation, envelope.type, payload):
+            self._gameplay.bootstrap_room_snapshot(payload)
             self._gameplay.activate_if_ready()
 
     def handle_transport_failure(
@@ -151,6 +152,22 @@ class ClientController:
 
     def disconnect_active_game(self) -> None:
         self._gameplay.disconnect_active_game()
+
+    def leave_active_room(self) -> None:
+        room = self._context.session.room
+        if room is None:
+            return
+        try:
+            self._context.dispatcher.send_immediate(
+                self._context.messages.room_leave(
+                    self._context.session.require_auth_token(),
+                    room.code,
+                )
+            )
+        except OSError:
+            pass
+        self._context.session.clear_room()
+        self._gameplay.stop_room_runtime()
 
     def _append_character(self, field_name: str, character: str) -> None:
         if field_name == "room_code":
