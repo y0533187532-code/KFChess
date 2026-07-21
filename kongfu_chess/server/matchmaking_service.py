@@ -126,6 +126,7 @@ class MatchmakingService:
         game_mode: GameModeConfig = PLAY_GAME_MODE,
         seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
         game_id_factory: Callable[[], str] | None = None,
+        lifecycle_service=None,
     ):
         self._auth_service = auth_service
         self._token_service = token_service
@@ -146,6 +147,7 @@ class MatchmakingService:
         self._game_mode = game_mode
         self._seat_adapter = seat_adapter
         self._game_id_factory = game_id_factory or (lambda: uuid.uuid4().hex)
+        self._lifecycle_service = lifecycle_service
         self._tickets: dict[int, QueueTicket] = {}
         self._matches_by_user: dict[int, PlayMatch] = {}
         self._matches_by_id: dict[str, PlayMatch] = {}
@@ -291,4 +293,6 @@ class MatchmakingService:
         self._matches_by_id[game_id] = match
         for seat in match.seats:
             self._matches_by_user[seat.user_id] = match
+        if self._lifecycle_service is not None:
+            self._lifecycle_service.register_play_match(match, now_ms=now_ms)
         return match

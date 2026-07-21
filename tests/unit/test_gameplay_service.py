@@ -66,7 +66,7 @@ def request(*, piece_id=7, expected=(1, 4), target=(3, 4)):
     )
 
 
-async def system(engine, *, auth=None, tokens=None):
+async def system(engine, *, auth=None, tokens=None, lifecycle=None):
     session = build_game_session(
         "game-1",
         engine,
@@ -80,8 +80,17 @@ async def system(engine, *, auth=None, tokens=None):
         auth or FakeAuth(),
         tokens or FakeTokens(),
         registry,
+        lifecycle_service=lifecycle,
     )
     return service, session
+
+
+class ActivityRecorder:
+    def __init__(self):
+        self.calls = []
+
+    def record_accepted_command(self, game_id, user_id):
+        self.calls.append((game_id, user_id))
 
 
 def test_valid_move_is_translated_inside_queue_and_increments_sequence():
@@ -193,3 +202,27 @@ def test_game_token_must_belong_to_authenticated_player():
 
     error = asyncio.run(scenario())
     assert error.code.value == "forbidden"
+
+
+def test_only_accepted_gameplay_is_reported_as_meaningful_activity():
+    async def scenario():
+        activity = ActivityRecorder()
+        engine = FakeEngine()
+        service, session = await system(engine, lifecycle=activity)
+        accepted = await service.submit(
+            SessionCommandType.MOVE, "accepted", request(), now_ms=1000
+        )
+        rejected = await service.submit(
+            SessionCommandType.MOVE,
+            "rejected",
+            request(piece_id=999),
+            now_ms=1001,
+        )
+        await session.close()
+        return activity.calls, accepted, rejected
+
+    calls, accepted, rejected = asyncio.run(scenario())
+
+    assert accepted.accepted is True
+    assert rejected.accepted is False
+    assert calls == [("game-1", 1)]

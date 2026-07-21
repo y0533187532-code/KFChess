@@ -30,6 +30,7 @@ class ProtocolErrorCode(str, Enum):
     GAME_NOT_FOUND = "game_not_found"
     GAME_OVER = "game_over"
     GAME_PAUSED = "game_paused"
+    INVALID_GAME_STATE = "invalid_game_state"
     ROOM_NOT_FOUND = "room_not_found"
     ROOM_FULL = "room_full"
     ROOM_CLOSED = "room_closed"

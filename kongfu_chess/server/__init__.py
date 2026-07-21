@@ -39,6 +39,22 @@ from .game_mode import (
     SeatBoundaryAdapter,
 )
 from .gameplay_handlers import GameplayHandlers
+from .game_lifecycle_models import (
+    GameLifecycleError,
+    GameLifecycleState,
+    GameLifecycleView,
+    LifecyclePlayer,
+)
+from .game_lifecycle_authorization import GameLifecycleAuthorization
+from .game_lifecycle_coordinator import GameLifecycleCoordinator
+from .game_lifecycle_reconnect_workflow import GameLifecycleReconnectWorkflow
+from .game_lifecycle_registration import GameLifecycleRegistration
+from .game_lifecycle_terminal_workflow import GameLifecycleTerminalWorkflow
+from .game_lifecycle_view_factory import GameLifecycleViewFactory
+from .game_result_finalizer import GameResultFinalizer
+from .reconnect_policy import ReconnectAction, ReconnectDecision, ReconnectPolicy
+from .game_lifecycle_service import GameLifecycleService, GameOverLifecycleSubscriber
+from .game_lifecycle_handlers import GameLifecycleHandlers
 from .gameplay_service import (
     BoardCoordinate,
     GameplayCommandService,
@@ -92,12 +108,26 @@ __all__ = [
     "GameMode",
     "GameModeConfig",
     "GameRole",
+    "GameLifecycleError",
+    "GameLifecycleAuthorization",
+    "GameLifecycleCoordinator",
+    "GameLifecycleHandlers",
+    "GameLifecycleReconnectWorkflow",
+    "GameLifecycleRegistration",
+    "GameLifecycleService",
+    "GameLifecycleState",
+    "GameLifecycleTerminalWorkflow",
+    "GameLifecycleView",
+    "GameLifecycleViewFactory",
+    "GameOverLifecycleSubscriber",
     "GameplayCommandService",
     "GameplayError",
     "GameplayHandlers",
     "GameplayRequest",
     "GameSessionRegistry",
     "HandlerResult",
+    "LifecyclePlayer",
+    "GameResultFinalizer",
     "MessageRouter",
     "NetworkGameAdapter",
     "OutgoingMessage",
@@ -109,6 +139,9 @@ __all__ = [
     "PlaySeat",
     "QueueTicket",
     "RequestContext",
+    "ReconnectAction",
+    "ReconnectDecision",
+    "ReconnectPolicy",
     "RoomAssignment",
     "RoomCodePolicy",
     "RoomSeatingPolicy",

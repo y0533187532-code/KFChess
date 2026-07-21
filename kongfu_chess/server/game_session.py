@@ -85,6 +85,7 @@ class GameSession:
         self._completed: OrderedDict[str, CommandResult] = OrderedDict()
         self._worker_task: asyncio.Task | None = None
         self._closed = False
+        self._paused = False
 
     @property
     def game_id(self) -> str:
@@ -97,6 +98,20 @@ class GameSession:
     @property
     def is_running(self) -> bool:
         return self._worker_task is not None and not self._worker_task.done()
+
+    @property
+    def is_paused(self) -> bool:
+        return self._paused
+
+    def pause(self) -> None:
+        if self._closed:
+            raise SessionClosedError("GameSession is closed")
+        self._paused = True
+
+    def resume(self) -> None:
+        if self._closed:
+            raise SessionClosedError("GameSession is closed")
+        self._paused = False
 
     def start(self) -> None:
         if self._closed:
@@ -154,8 +169,17 @@ class GameSession:
     async def _process(self, queued: _QueuedCommand) -> None:
         command = queued.command
         try:
-            handler = self._handlers.get(command.kind)
-            if handler is None:
+            if self._paused and command.kind in {
+                SessionCommandType.MOVE.value,
+                SessionCommandType.JUMP.value,
+                SessionCommandType.TICK.value,
+            }:
+                handled = HandlerResult(
+                    accepted=False,
+                    changed=False,
+                    code=ProtocolErrorCode.GAME_PAUSED.value,
+                )
+            elif (handler := self._handlers.get(command.kind)) is None:
                 handled = HandlerResult(
                     accepted=False,
                     changed=False,

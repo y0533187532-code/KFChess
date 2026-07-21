@@ -149,4 +149,43 @@ MIGRATIONS = (
             WHERE left_at_ms IS NULL AND role = 'PLAYER' AND color IS NOT NULL;
         """,
     ),
+    (
+        3,
+        """
+        CREATE TABLE game_lifecycles (
+            game_id TEXT PRIMARY KEY,
+            mode TEXT NOT NULL CHECK (mode IN ('PLAY', 'ROOM')),
+            ranked INTEGER NOT NULL CHECK (ranked IN (0, 1)),
+            state TEXT NOT NULL CHECK (state IN (
+                'CREATED', 'WAITING_TO_START', 'ACTIVE',
+                'PAUSED_FOR_RECONNECT', 'ENDED', 'CANCELLED', 'INTERRUPTED'
+            )),
+            room_id INTEGER REFERENCES rooms(id),
+            double_disconnect INTEGER NOT NULL DEFAULT 0
+                CHECK (double_disconnect IN (0, 1)),
+            winner_seat TEXT CHECK (
+                winner_seat IN ('FIRST_PLAYER', 'SECOND_PLAYER')
+                OR winner_seat IS NULL
+            ),
+            terminal_reason TEXT,
+            version INTEGER NOT NULL DEFAULT 0,
+            created_at_ms INTEGER NOT NULL,
+            started_at_ms INTEGER,
+            ended_at_ms INTEGER
+        );
+
+        CREATE TABLE game_lifecycle_players (
+            game_id TEXT NOT NULL REFERENCES game_lifecycles(game_id),
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            seat TEXT NOT NULL CHECK (seat IN ('FIRST_PLAYER', 'SECOND_PLAYER')),
+            connected INTEGER NOT NULL DEFAULT 1 CHECK (connected IN (0, 1)),
+            reconnect_deadline_ms INTEGER,
+            meaningful_activity INTEGER NOT NULL DEFAULT 0
+                CHECK (meaningful_activity IN (0, 1)),
+            PRIMARY KEY (game_id, user_id),
+            UNIQUE (game_id, seat)
+        );
+        CREATE INDEX idx_game_lifecycle_state ON game_lifecycles(state);
+        """,
+    ),
 )

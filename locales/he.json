@@ -25,6 +25,7 @@
   "game_not_found": "המשחק לא נמצא.",
   "game_over": "המשחק כבר הסתיים.",
   "game_paused": "המשחק מושהה זמנית.",
+  "invalid_game_state": "מצב המשחק אינו מאפשר את הפעולה הזו.",
   "room_not_found": "החדר לא נמצא.",
   "room_full": "החדר מלא.",
   "room_closed": "החדר נסגר.",

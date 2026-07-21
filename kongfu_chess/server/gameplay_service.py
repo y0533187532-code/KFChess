@@ -56,6 +56,20 @@ class GameSessionRegistry:
     def remove(self, game_id: str) -> GameSession | None:
         return self._sessions.pop(game_id, None)
 
+    def pause(self, game_id: str) -> bool:
+        session = self.get(game_id)
+        if session is None:
+            return False
+        session.pause()
+        return True
+
+    def resume(self, game_id: str) -> bool:
+        session = self.get(game_id)
+        if session is None:
+            return False
+        session.resume()
+        return True
+
 
 class GameplayCommandService:
     """Authenticate a request, authorize its game seat, then enqueue it."""
@@ -67,11 +81,13 @@ class GameplayCommandService:
         sessions: GameSessionRegistry,
         *,
         seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
+        lifecycle_service=None,
     ):
         self._auth_service = auth_service
         self._token_service = token_service
         self._sessions = sessions
         self._seat_adapter = seat_adapter
+        self._lifecycle_service = lifecycle_service
 
     async def submit(
         self,
@@ -107,7 +123,7 @@ class GameplayCommandService:
         session = self._sessions.get(request.game_id)
         if session is None:
             raise GameplayError(ProtocolErrorCode.GAME_NOT_FOUND)
-        return await session.submit(
+        result = await session.submit(
             SessionCommand(
                 kind=kind.value,
                 request_id=request_id,
@@ -121,6 +137,11 @@ class GameplayCommandService:
                 ),
             )
         )
+        if result.accepted and self._lifecycle_service is not None:
+            self._lifecycle_service.record_accepted_command(
+                request.game_id, principal.user_id
+            )
+        return result
 
 
 class NetworkGameAdapter:

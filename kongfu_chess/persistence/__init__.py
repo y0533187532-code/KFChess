@@ -3,6 +3,7 @@
 from .database import SqliteDatabase
 from .repositories import (
     AuthSessionRepository,
+    GameLifecycleRepository,
     GameTokenRepository,
     MatchRepository,
     RoomRepository,
@@ -12,6 +13,7 @@ from .tokens import IssuedToken, TokenService
 
 __all__ = [
     "AuthSessionRepository",
+    "GameLifecycleRepository",
     "GameTokenRepository",
     "IssuedToken",
     "MatchRepository",

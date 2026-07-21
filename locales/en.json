@@ -25,6 +25,7 @@
   "game_not_found": "The game was not found.",
   "game_over": "The game has already ended.",
   "game_paused": "The game is temporarily paused.",
+  "invalid_game_state": "The game is not in a valid state for this action.",
   "room_not_found": "The room was not found.",
   "room_full": "The room is full.",
   "room_closed": "The room has closed.",

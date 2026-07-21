@@ -144,3 +144,33 @@ def test_close_drains_queued_work_and_rejects_new_submissions():
 
     assert result.sequence == 1
     assert is_running is False
+
+
+def test_pause_gate_rejects_mutations_without_calling_handler_or_advancing_sequence():
+    async def scenario():
+        calls = 0
+
+        def handler(_command):
+            nonlocal calls
+            calls += 1
+            return HandlerResult(True, True, "ok")
+
+        session = GameSession(
+            "game-1", {"move": handler}, initial_sequence=3, request_cache_size=8
+        )
+        session.start()
+        session.pause()
+        paused = await session.submit(SessionCommand("move", "paused-request"))
+        session.resume()
+        resumed = await session.submit(SessionCommand("move", "resumed-request"))
+        await session.close()
+        return calls, paused, resumed
+
+    calls, paused, resumed = run(scenario())
+
+    assert paused.accepted is False
+    assert paused.code == "game_paused"
+    assert paused.sequence == 3
+    assert resumed.accepted is True
+    assert resumed.sequence == 4
+    assert calls == 1

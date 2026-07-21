@@ -58,3 +58,29 @@ class RoomMemberRecord:
     color: str | None
     joined_at_ms: int
     left_at_ms: int | None
+
+
+@dataclass(frozen=True)
+class GameLifecycleRecord:
+    game_id: str
+    mode: str
+    ranked: bool
+    state: str
+    room_id: int | None
+    double_disconnect: bool
+    winner_seat: str | None
+    terminal_reason: str | None
+    version: int
+    created_at_ms: int
+    started_at_ms: int | None
+    ended_at_ms: int | None
+
+
+@dataclass(frozen=True)
+class GameLifecyclePlayerRecord:
+    game_id: str
+    user_id: int
+    seat: str
+    connected: bool
+    reconnect_deadline_ms: int | None
+    meaningful_activity: bool

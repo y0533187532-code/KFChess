@@ -39,6 +39,7 @@ class RoomsService:
         game_id_factory: Callable[[], str] | None = None,
         active_game_checker: Callable[[int], bool] | None = None,
         snapshot_provider: Callable[[str], Mapping | None] | None = None,
+        lifecycle_service=None,
     ):
         self._auth_service = auth_service
         self._tokens = token_service
@@ -57,6 +58,7 @@ class RoomsService:
         )
         self._game_id_factory = game_id_factory or (lambda: uuid.uuid4().hex)
         self._active_game_checker = active_game_checker or (lambda _user_id: False)
+        self._lifecycle_service = lifecycle_service
 
     @classmethod
     def from_config(
@@ -101,6 +103,13 @@ class RoomsService:
             color=member.color,
             now_ms=now_ms,
         )
+        if self._lifecycle_service is not None:
+            self._lifecycle_service.register_room(
+                room_id=room.id,
+                game_id=room.game_id,
+                creator_user_id=principal.user_id,
+                now_ms=now_ms,
+            )
         return self._views.create(room, member, game_token=issued.value)
 
     def join(self, auth_token: str, code: str, *, now_ms: int) -> RoomView:
@@ -137,6 +146,13 @@ class RoomsService:
             if room.status == RoomStatus.WAITING.value:
                 self._rooms.activate(room.id)
             room = self._rooms.by_id(room.id)
+            if self._lifecycle_service is not None:
+                self._lifecycle_service.add_room_player(
+                    room.game_id,
+                    principal.user_id,
+                    assignment.seat,
+                    now_ms=now_ms,
+                )
         else:
             spectator_count = sum(
                 member.role == GameRole.SPECTATOR.value for member in members
@@ -187,8 +203,16 @@ class RoomsService:
         if role is GameRole.PLAYER and seat is self._seating_policy.creator_seat:
             self._rooms.close(room.id, reason="creator_left", now_ms=now_ms)
             self._tokens.revoke_game_tokens(room.game_id, now_ms=now_ms)
+            if self._lifecycle_service is not None:
+                self._lifecycle_service.cancel(
+                    room.game_id, reason="creator_left", now_ms=now_ms
+                )
         elif role is GameRole.PLAYER and seat is self._seating_policy.opponent_seat:
             self._rooms.return_to_waiting(room.id)
+            if self._lifecycle_service is not None:
+                self._lifecycle_service.remove_room_player(
+                    room.game_id, principal.user_id
+                )
         room = self._rooms.by_id(room.id)
         return self._views.create(room, member, departed=True)
 
