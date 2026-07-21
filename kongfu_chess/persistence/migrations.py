@@ -93,4 +93,60 @@ MIGRATIONS = (
         CREATE INDEX idx_room_members_room ON room_members(room_id);
         """,
     ),
+    (
+        2,
+        """
+        CREATE TABLE rooms_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL COLLATE NOCASE UNIQUE
+                CHECK (length(code) = 6 AND code = upper(code)
+                    AND code NOT GLOB '*[^A-Z0-9]*'),
+            game_id TEXT NOT NULL UNIQUE,
+            creator_user_id INTEGER REFERENCES users(id),
+            status TEXT NOT NULL
+                CHECK (status IN ('WAITING', 'ACTIVE', 'CLOSED', 'INTERRUPTED', 'ENDED')),
+            created_at_ms INTEGER NOT NULL,
+            started_at_ms INTEGER,
+            closed_at_ms INTEGER,
+            close_reason TEXT
+        );
+
+        INSERT INTO rooms_v2(
+            id, code, game_id, creator_user_id, status, created_at_ms,
+            started_at_ms, closed_at_ms, close_reason
+        )
+        SELECT id, code, 'legacy-room-' || id, creator_user_id, status,
+               created_at_ms, started_at_ms, closed_at_ms, close_reason
+        FROM rooms;
+
+        CREATE TABLE room_members_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL REFERENCES rooms_v2(id),
+            user_id INTEGER REFERENCES users(id),
+            role TEXT NOT NULL CHECK (role IN ('PLAYER', 'SPECTATOR')),
+            color TEXT CHECK (color IN ('w', 'b') OR color IS NULL),
+            joined_at_ms INTEGER NOT NULL,
+            left_at_ms INTEGER
+        );
+
+        INSERT INTO room_members_v2(
+            id, room_id, user_id, role, color, joined_at_ms, left_at_ms
+        )
+        SELECT id, room_id, user_id, role, color, joined_at_ms, left_at_ms
+        FROM room_members;
+
+        DROP TABLE room_members;
+        DROP TABLE rooms;
+        ALTER TABLE rooms_v2 RENAME TO rooms;
+        ALTER TABLE room_members_v2 RENAME TO room_members;
+
+        CREATE INDEX idx_room_members_room ON room_members(room_id);
+        CREATE UNIQUE INDEX idx_room_active_user
+            ON room_members(room_id, user_id)
+            WHERE left_at_ms IS NULL AND user_id IS NOT NULL;
+        CREATE UNIQUE INDEX idx_room_active_color
+            ON room_members(room_id, color)
+            WHERE left_at_ms IS NULL AND role = 'PLAYER' AND color IS NOT NULL;
+        """,
+    ),
 )

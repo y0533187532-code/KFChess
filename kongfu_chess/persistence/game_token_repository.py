@@ -80,6 +80,18 @@ class GameTokenRepository:
             )
         return cursor.rowcount
 
+    def revoke_game_user(self, game_id: str, user_id: int, *, now_ms: int) -> int:
+        with self._database.transaction() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE game_session_tokens
+                SET status = 'REVOKED', revoked_at_ms = ?
+                WHERE game_id = ? AND user_id = ? AND status != 'REVOKED'
+                """,
+                (now_ms, game_id, user_id),
+            )
+        return cursor.rowcount
+
 
 def _game_token_record(row) -> GameTokenRecord:
     return GameTokenRecord(

@@ -58,6 +58,12 @@ from .matchmaking_service import (
     QueueTicket,
 )
 from .matchmaking_handlers import MatchmakingHandlers
+from .rooms_handlers import RoomsHandlers
+from .room_models import RoomStatus, RoomsError, RoomView
+from .rooms_service import RoomsService
+from .room_code_policy import RoomCodePolicy
+from .room_seating_policy import RoomAssignment, RoomSeatingPolicy
+from .room_view_factory import RoomViewFactory
 from .routing import MessageRouter, OutgoingMessage, RequestContext
 from .websocket_gateway import WebSocketGateway
 
@@ -103,6 +109,15 @@ __all__ = [
     "PlaySeat",
     "QueueTicket",
     "RequestContext",
+    "RoomAssignment",
+    "RoomCodePolicy",
+    "RoomSeatingPolicy",
+    "RoomStatus",
+    "RoomsError",
+    "RoomsHandlers",
+    "RoomsService",
+    "RoomView",
+    "RoomViewFactory",
     "ROOM_GAME_MODE",
     "RegisteredAccount",
     "build_auth_service",

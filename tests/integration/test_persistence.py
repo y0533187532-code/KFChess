@@ -117,13 +117,19 @@ def test_room_metadata_and_membership_history_are_persisted(tmp_path):
     creator = create_user(users, "Creator")
     rooms = RoomRepository(database)
 
-    room = rooms.create(code="abc234", creator_user_id=creator.id, now_ms=1000)
-    member_id = rooms.add_member(
+    room = rooms.create(
+        code="abc234",
+        game_id="room-game-1",
+        creator_user_id=creator.id,
+        now_ms=1000,
+    )
+    member = rooms.add_member(
         room_id=room.id, user_id=creator.id, role="PLAYER", color="w", now_ms=1000
     )
 
     assert room.code == "ABC234"
-    assert rooms.leave_member(member_id, now_ms=2000) is True
+    assert room.game_id == "room-game-1"
+    assert rooms.leave_member(member.id, now_ms=2000) is True
     assert rooms.close(room.id, reason="host_left", now_ms=2000) is True
     with database.transaction() as connection:
         row = connection.execute("SELECT status, close_reason FROM rooms").fetchone()

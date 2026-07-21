@@ -43,5 +43,18 @@ class GameTokenRecord:
 class RoomRecord:
     id: int
     code: str
+    game_id: str
     creator_user_id: int | None
     status: str
+    started_at_ms: int | None
+
+
+@dataclass(frozen=True)
+class RoomMemberRecord:
+    id: int
+    room_id: int
+    user_id: int | None
+    role: str
+    color: str | None
+    joined_at_ms: int
+    left_at_ms: int | None

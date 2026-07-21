@@ -30,6 +30,7 @@
   "room_closed": "The room has closed.",
   "invalid_room_code": "The room code is invalid.",
   "already_in_game": "You are already in a game.",
+  "already_in_room": "You are already in a room.",
   "matchmaking_timeout": "No opponent was found in time.",
   "already_in_matchmaking": "You are already waiting for a match.",
   "matchmaking_queue_full": "The matchmaking queue is full.",

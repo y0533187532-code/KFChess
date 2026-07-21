@@ -35,6 +35,7 @@ class ProtocolErrorCode(str, Enum):
     ROOM_CLOSED = "room_closed"
     INVALID_ROOM_CODE = "invalid_room_code"
     ALREADY_IN_GAME = "already_in_game"
+    ALREADY_IN_ROOM = "already_in_room"
     MATCHMAKING_TIMEOUT = "matchmaking_timeout"
     ALREADY_IN_MATCHMAKING = "already_in_matchmaking"
     MATCHMAKING_QUEUE_FULL = "matchmaking_queue_full"

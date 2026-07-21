@@ -30,6 +30,7 @@
   "room_closed": "החדר נסגר.",
   "invalid_room_code": "קוד החדר אינו תקין.",
   "already_in_game": "כבר קיים משחק פעיל עבורך.",
+  "already_in_room": "כבר הצטרפת לחדר.",
   "matchmaking_timeout": "לא נמצא יריב בזמן שהוגדר.",
   "already_in_matchmaking": "כבר הצטרפת לתור למציאת משחק.",
   "matchmaking_queue_full": "התור למציאת משחק מלא.",

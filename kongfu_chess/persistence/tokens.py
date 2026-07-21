@@ -77,6 +77,16 @@ class TokenService:
     def revoke_game(self, value: str, *, now_ms: int) -> bool:
         return self._game_tokens.revoke(self.hash_token(value), now_ms=now_ms)
 
+    def revoke_game_tokens(self, game_id: str, *, now_ms: int) -> int:
+        return self._game_tokens.revoke_game(game_id, now_ms=now_ms)
+
+    def revoke_user_game_tokens(
+        self, game_id: str, user_id: int, *, now_ms: int
+    ) -> int:
+        return self._game_tokens.revoke_game_user(
+            game_id, user_id, now_ms=now_ms
+        )
+
     @staticmethod
     def hash_token(value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
