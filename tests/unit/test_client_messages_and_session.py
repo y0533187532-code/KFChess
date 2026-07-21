@@ -43,12 +43,13 @@ def test_auth_message_payloads_use_shared_envelope():
     }
 
 
-def test_play_and_room_payloads_include_auth_and_normalize_room_codes():
+def test_authenticated_payloads_include_auth_and_normalize_room_codes():
     messages = factory()
     token = "auth-secret"
 
     requests = (
         messages.logout(token),
+        messages.validate_auth(token),
         messages.play_join(token),
         messages.play_cancel(token),
         messages.play_status(token),
@@ -60,6 +61,7 @@ def test_play_and_room_payloads_include_auth_and_normalize_room_codes():
 
     assert [item.type for item in requests] == [
         "logout_request",
+        "validate_auth_request",
         "play_queue_join",
         "play_queue_cancel",
         "play_queue_status",
@@ -100,6 +102,25 @@ def test_client_session_stores_play_identity_and_redacts_tokens():
     assert session.game.color == "w"
     assert "raw-auth-token" not in repr(session)
     assert "raw-game-token" not in repr(session)
+
+
+def test_client_session_refreshes_validated_principal_without_replacing_token():
+    session = ClientSessionState()
+    session.authenticate(
+        {
+            "user_id": 7,
+            "username": "Dana",
+            "rating": 1200,
+            "auth_token": "raw-auth-token",
+            "expires_at_ms": 9000,
+        }
+    )
+
+    session.refresh_principal({"user_id": 7, "username": "Dana", "rating": 1216})
+
+    assert session.rating == 1216
+    assert session.expires_at_ms == 9000
+    assert session.require_auth_token() == "raw-auth-token"
 
 
 def test_client_session_tracks_player_and_spectator_rooms_then_clears():

@@ -11,7 +11,7 @@ class AuthenticationFlow:
     _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
     _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     _PHONE_PATTERN = re.compile(r"^\+?[0-9]{7,15}$")
-    _OPERATIONS = {"login", "register", "logout"}
+    _OPERATIONS = {"login", "register", "logout", "validate_auth"}
     _ACTIONS = {
         UiAction.SHOW_LOGIN,
         UiAction.SHOW_REGISTER,
@@ -49,14 +49,32 @@ class AuthenticationFlow:
         if operation == "login":
             self._context.session.authenticate(payload)
             self._clear_auth_fields()
-            self._context.show(ClientScreen.MAIN_MENU)
+            self._context.submit(
+                self._context.messages.validate_auth(
+                    self._context.session.require_auth_token()
+                ),
+                "validate_auth",
+            )
         elif operation == "register":
             self._clear_auth_fields()
             self._context.show(ClientScreen.LOGIN)
             self._context.show_message("registration_success")
+        elif operation == "validate_auth":
+            self._context.session.refresh_principal(payload)
+            self._context.show(ClientScreen.MAIN_MENU)
         else:
             self._context.session.clear()
             self._context.show(ClientScreen.LOGIN)
+        return True
+
+    def handle_failure(self, operation: str | None, error_code: str) -> bool:
+        if operation not in self._OPERATIONS:
+            return False
+        if operation == "validate_auth":
+            self._context.session.clear()
+            self._context.show(ClientScreen.LOGIN)
+        self.clear_password_for(operation)
+        self._context.show_error(error_code)
         return True
 
     def clear_password_for(self, operation: str | None) -> None:

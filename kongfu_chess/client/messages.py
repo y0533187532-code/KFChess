@@ -36,6 +36,9 @@ class ClientMessageFactory:
     def logout(self, auth_token: str) -> MessageEnvelope:
         return self._authenticated(MessageType.LOGOUT_REQUEST, auth_token)
 
+    def validate_auth(self, auth_token: str) -> MessageEnvelope:
+        return self._authenticated(MessageType.VALIDATE_AUTH_REQUEST, auth_token)
+
     def play_join(self, auth_token: str) -> MessageEnvelope:
         return self._authenticated(MessageType.PLAY_QUEUE_JOIN, auth_token)
 

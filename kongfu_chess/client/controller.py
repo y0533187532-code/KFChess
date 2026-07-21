@@ -99,8 +99,9 @@ class ClientController:
         if self._matchmaking.handle_timeout(envelope.type):
             return
         if envelope.type == MessageType.ERROR.value or payload.get("accepted") is False:
-            self._context.show_error(str(payload.get("code", "internal_error")))
-            self._authentication.clear_password_for(operation)
+            error_code = str(payload.get("code", "internal_error"))
+            if not self._authentication.handle_failure(operation, error_code):
+                self._context.show_error(error_code)
             return
         if self._authentication.handle_success(operation, payload):
             return
@@ -112,8 +113,8 @@ class ClientController:
         self, request_id: str, error_code: str = "network_error"
     ) -> None:
         operation = self._context.complete(request_id)
-        self._authentication.clear_password_for(operation)
-        self._context.show_error(error_code)
+        if not self._authentication.handle_failure(operation, error_code):
+            self._context.show_error(error_code)
 
     def _append_character(self, field_name: str, character: str) -> None:
         if field_name == "room_code":

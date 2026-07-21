@@ -21,7 +21,7 @@ class Dispatcher:
         self.sent.append(envelope)
 
 
-def make_controller():
+def make_controller(*, localizer=None):
     dispatcher = Dispatcher()
     ids = iter(f"request-{index}" for index in range(30))
     controller = ClientController(
@@ -32,7 +32,7 @@ def make_controller():
             request_id_factory=lambda: next(ids),
         ),
         dispatcher,
-        ClientLocalizer(),
+        localizer or ClientLocalizer(),
         ClientUiConstraints(3, 20, 6),
     )
     return controller, dispatcher
@@ -51,10 +51,7 @@ def response(request, message_type, payload):
     )
 
 
-def authenticate(controller, dispatcher):
-    controller.state.fields.update(username="Dana", password="secret7")
-    controller.handle_action(UiAction.SUBMIT_LOGIN)
-    request = dispatcher.sent[-1]
+def accept_login(controller, dispatcher, request, *, rating=1200):
     controller.handle_response(
         response(
             request,
@@ -64,12 +61,37 @@ def authenticate(controller, dispatcher):
                 "code": "ok",
                 "user_id": 7,
                 "username": "Dana",
-                "rating": 1200,
+                "rating": rating,
                 "auth_token": "auth-token",
                 "expires_at_ms": 99999,
             },
         )
     )
+    return dispatcher.sent[-1]
+
+
+def accept_validation(controller, validation, *, rating=1200):
+    controller.handle_response(
+        response(
+            validation,
+            "command_result",
+            {
+                "accepted": True,
+                "code": "ok",
+                "user_id": 7,
+                "username": "Dana",
+                "rating": rating,
+            },
+        )
+    )
+
+
+def authenticate(controller, dispatcher):
+    controller.state.fields.update(username="Dana", password="secret7")
+    controller.handle_action(UiAction.SUBMIT_LOGIN)
+    request = dispatcher.sent[-1]
+    validation = accept_login(controller, dispatcher, request)
+    accept_validation(controller, validation)
 
 
 def test_login_validates_inline_masks_password_and_stores_session():
@@ -87,24 +109,58 @@ def test_login_validates_inline_masks_password_and_stores_session():
     assert request.type == "login_request"
     assert controller.state.loading is True
 
-    controller.handle_response(
-        response(
-            request,
-            "command_result",
-            {
-                "accepted": True,
-                "code": "ok",
-                "user_id": 7,
-                "username": "Dana",
-                "rating": 1200,
-                "auth_token": "auth-token",
-                "expires_at_ms": 99999,
-            },
-        )
-    )
+    validation = accept_login(controller, dispatcher, request)
+    assert validation.type == "validate_auth_request"
+    assert validation.payload["auth_token"] == "auth-token"
+    assert controller.state.screen is ClientScreen.LOGIN
+    assert controller.state.loading is True
+    assert controller.session.authenticated is True
+
+    accept_validation(controller, validation, rating=1216)
     assert controller.state.screen is ClientScreen.MAIN_MENU
     assert controller.session.authenticated is True
+    assert controller.session.rating == 1216
     assert controller.state.fields["password"] == ""
+
+
+def test_validation_failure_clears_session_and_returns_to_localized_login():
+    controller, dispatcher = make_controller(
+        localizer=ClientLocalizer(
+            strings={"token_revoked": "Your session is no longer valid."}
+        )
+    )
+    controller.state.fields.update(username="Dana", password="secret7")
+    controller.handle_action(UiAction.SUBMIT_LOGIN)
+    login = dispatcher.sent[-1]
+    validation = accept_login(controller, dispatcher, login)
+
+    controller.handle_response(
+        response(
+            validation,
+            "command_result",
+            {"accepted": False, "code": "token_revoked"},
+        )
+    )
+
+    assert controller.state.screen is ClientScreen.LOGIN
+    assert controller.state.inline_message == "Your session is no longer valid."
+    assert controller.state.loading is False
+    assert controller.session.authenticated is False
+    assert "auth-token" not in repr(controller.session)
+
+
+def test_validation_transport_failure_clears_session_and_returns_to_login():
+    controller, dispatcher = make_controller()
+    controller.state.fields.update(username="Dana", password="secret7")
+    controller.handle_action(UiAction.SUBMIT_LOGIN)
+    login = dispatcher.sent[-1]
+    validation = accept_login(controller, dispatcher, login)
+
+    controller.handle_transport_failure(validation.request_id)
+
+    assert controller.state.screen is ClientScreen.LOGIN
+    assert controller.state.inline_message == "Cannot reach the game server."
+    assert controller.session.authenticated is False
 
 
 def test_registration_validates_fields_and_returns_to_login():

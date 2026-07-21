@@ -61,6 +61,13 @@ class ClientSessionState:
         self.expires_at_ms = int(payload["expires_at_ms"])
         self._auth_token = str(payload["auth_token"])
 
+    def refresh_principal(self, payload: Mapping) -> None:
+        if not self.authenticated:
+            raise RuntimeError("Authentication is required")
+        self.user_id = int(payload["user_id"])
+        self.username = str(payload["username"])
+        self.rating = int(payload["rating"])
+
     def store_play_match(self, payload: Mapping) -> None:
         color = str(payload["color"])
         seat = payload.get("seat", self._COLOR_TO_SEAT.get(color))
