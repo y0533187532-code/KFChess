@@ -244,3 +244,67 @@ def test_renderer_draws_authoritative_board_identity_and_reconnect_status(
     assert renderer.hit_test(300, 200).kind == "board_cell"
     assert renderer.hit_test(300, 200).value == (1, 0)
     assert all("never-render" not in text for text in rendered_text)
+
+
+def test_renderer_shows_game_over_banner_and_leave_button(monkeypatch):
+    game_view = FakeGameView()
+    renderer = OpenCvClientRenderer(ClientLocalizer(), game_view=game_view)
+    session = authenticated_session()
+    session.store_play_match(
+        {
+            "game_id": "game-1",
+            "game_token": "token",
+            "role": "PLAYER",
+            "seat": "FIRST_PLAYER",
+            "color": "w",
+            "mode": "PLAY",
+            "ranked": True,
+        }
+    )
+    snapshot = GameSnapshot(8, 8, True, pieces=())
+    state = ClientUiState(
+        screen=ClientScreen.GAME_BOARD,
+        game_snapshot=snapshot,
+        game_lifecycle_state="ENDED",
+        inline_message="You won the game.",
+    )
+    rendered_text = []
+    monkeypatch.setattr(
+        "kongfu_chess.client.screen_renderer.cv2.putText",
+        lambda _frame, value, *_args: rendered_text.append(str(value)),
+    )
+
+    renderer.render(state, session)
+
+    assert "GAME OVER" in rendered_text
+    assert "Leave game" in rendered_text
+    assert "You won the game." in rendered_text
+
+
+def test_renderer_leave_confirm_overlay_exposes_confirm_and_cancel_actions():
+    renderer = OpenCvClientRenderer(ClientLocalizer(), game_view=FakeGameView())
+    session = authenticated_session()
+    session.store_play_match(
+        {
+            "game_id": "game-1",
+            "game_token": "token",
+            "role": "PLAYER",
+            "seat": "FIRST_PLAYER",
+            "color": "w",
+            "mode": "PLAY",
+            "ranked": True,
+        }
+    )
+    state = ClientUiState(
+        screen=ClientScreen.GAME_BOARD,
+        game_snapshot=GameSnapshot(8, 8, False, pieces=()),
+        game_lifecycle_state="ACTIVE",
+        game_leave_confirm_pending=True,
+    )
+
+    renderer.render(state, session)
+
+    confirm_hit = renderer.hit_test(515, 439)
+    cancel_hit = renderer.hit_test(755, 439)
+    assert confirm_hit.value is UiAction.GAME_LEAVE_CONFIRM
+    assert cancel_hit.value is UiAction.GAME_LEAVE_CANCEL

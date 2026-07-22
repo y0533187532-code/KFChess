@@ -32,7 +32,17 @@ class WebSocketGateway:
 
     async def handle(self, websocket) -> None:
         connection_id = uuid.uuid4().hex
-        await self._registry.add(connection_id, websocket)
+        if not await self._registry.try_add(connection_id, websocket):
+            self._log(
+                "connection_rejected",
+                connection_id=connection_id,
+                reason="connection_limit_reached",
+            )
+            await websocket.close(
+                1013,
+                "connection limit reached",
+            )
+            return
         self._log("connection_opened", connection_id=connection_id)
         try:
             async for raw in websocket:

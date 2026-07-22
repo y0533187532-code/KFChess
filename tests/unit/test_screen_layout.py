@@ -87,3 +87,10 @@ def test_screen_to_board_pixels_ignores_click_outside_board():
     assert screen_to_board_pixels(BOARD_X_PX, BOARD_Y_PX - 1) is None
     assert screen_to_board_pixels(BOARD_X_PX + BOARD_SIZE_PX, BOARD_Y_PX) is None
     assert screen_to_board_pixels(BOARD_X_PX, BOARD_Y_PX + BOARD_SIZE_PX) is None
+
+
+def test_split_move_line_keeps_piece_name_in_move_column():
+    from kongfu_chess.graphics.layout.screen_layout import _split_move_line
+
+    assert _split_move_line("0.0s Pawn: d2->f2") == ("0.0s", "Pawn: d2->f2")
+    assert _split_move_line("1.5s King: jump e1") == ("1.5s", "King: jump e1")

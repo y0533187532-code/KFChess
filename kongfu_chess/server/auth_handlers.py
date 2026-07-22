@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
+from .event_logger import ServerEventLogger
 from .routing import OutgoingMessage
 
 
 class AuthHandlers:
-    def __init__(self, auth_service, *, clock_ms):
+    def __init__(self, auth_service, *, clock_ms, events: ServerEventLogger | None = None):
         self._auth_service = auth_service
         self._clock_ms = clock_ms
+        self._events = events or ServerEventLogger(None)
 
     def register_routes(self, router) -> None:
         router.register(MessageType.REGISTER_REQUEST.value, self.register)
@@ -23,7 +25,7 @@ class AuthHandlers:
         payload = self._payload(
             context, {"username", "password", "email", "phone"}
         )
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._registered(
                 self._auth_service.register(
                     username=payload["username"],
@@ -34,10 +36,12 @@ class AuthHandlers:
                 )
             )
         )
+        self._log_auth(context, "register", outgoing)
+        return outgoing
 
     def login(self, context) -> OutgoingMessage:
         payload = self._payload(context, {"username", "password"})
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._authenticated(
                 self._auth_service.login(
                     username=payload["username"],
@@ -46,6 +50,8 @@ class AuthHandlers:
                 )
             )
         )
+        self._log_auth(context, "login", outgoing)
+        return outgoing
 
     def logout(self, context) -> OutgoingMessage:
         payload = self._payload(context, {"auth_token"})
@@ -137,3 +143,18 @@ class AuthHandlers:
                 "rating": principal.rating,
             }
         )
+
+    def _log_auth(self, context, action: str, outgoing: OutgoingMessage) -> None:
+        payload = outgoing.payload
+        accepted = payload.get("accepted")
+        event = f"auth_{action}_{'succeeded' if accepted else 'failed'}"
+        fields = {
+            "request_id": context.envelope.request_id,
+            "connection_id": context.connection_id,
+            "accepted": accepted,
+        }
+        if payload.get("code"):
+            fields["code"] = payload["code"]
+        if accepted and payload.get("user_id") is not None:
+            fields["user_id"] = payload["user_id"]
+        self._events.event(event, **fields)

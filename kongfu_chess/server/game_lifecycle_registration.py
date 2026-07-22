@@ -14,10 +14,18 @@ from .game_mode import GameMode, PlayerSeat
 
 
 class GameLifecycleRegistration:
-    def __init__(self, coordinator, *, room_repository=None, runtime_factory=None):
+    def __init__(
+        self,
+        coordinator,
+        *,
+        room_repository=None,
+        runtime_factory=None,
+        max_active_games: int | None = None,
+    ):
         self._context = coordinator
         self._rooms = room_repository
         self._runtime_factory = runtime_factory
+        self._max_active_games = max_active_games
 
     def _start_runtime(self, game_id: str) -> None:
         if self._runtime_factory is not None:
@@ -73,6 +81,12 @@ class GameLifecycleRegistration:
             existing = self._context.lifecycles.by_id(game_id)
             if existing is not None:
                 return self._context.views.create(existing, changed=False)
+            if (
+                self._max_active_games is not None
+                and self._context.lifecycles.count_live_games()
+                >= self._max_active_games
+            ):
+                raise GameLifecycleError(ProtocolErrorCode.ACTIVE_GAMES_FULL)
             normalized_players = tuple(
                 (user_id, PlayerSeat(seat).value) for user_id, seat in players
             )

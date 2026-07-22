@@ -1,3 +1,4 @@
+
 # Kong-Fu Chess
 
 Kong-Fu Chess is a real-time chess engine written in Python. Unlike traditional
@@ -13,6 +14,12 @@ an OpenCV game window for interactive use.
 The project targets Python 3.11. The graphical interface also requires
 `opencv-python` and `numpy`; the test suite requires `pytest` and `pytest-cov`.
 
+Run the authoritative WebSocket server (uses `config/server.json`):
+
+```powershell
+py -3.11 -m kongfu_chess.server
+```
+
 Run the graphical game:
 
 ```powershell
@@ -26,6 +33,12 @@ Room entry (with the configured server running):
 
 ```powershell
 py -3.11 -m kongfu_chess.client
+```
+
+For Hebrew UI:
+
+```powershell
+py -3.11 -m kongfu_chess.client --language he
 ```
 
 The production client keeps all forms, keyboard input, buttons, errors, and

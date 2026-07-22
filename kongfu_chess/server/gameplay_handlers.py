@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
+from .event_logger import ServerEventLogger
 from .game_session import SessionCommandType
 from .gameplay_service import (
     BoardCoordinate,
@@ -26,10 +27,11 @@ class GameplayHandlers:
         "target",
     }
 
-    def __init__(self, gameplay_service, *, clock_ms, game_connections=None):
+    def __init__(self, gameplay_service, *, clock_ms, game_connections=None, events=None):
         self._gameplay_service = gameplay_service
         self._clock_ms = clock_ms
         self._game_connections = game_connections
+        self._events = events or ServerEventLogger(None)
 
     def register_routes(self, router) -> None:
         router.register(MessageType.MOVE_REQUEST.value, self.move)
@@ -91,9 +93,35 @@ class GameplayHandlers:
             if result.accepted:
                 self._bind_connection(context.connection_id, request)
         except (AuthError, GameplayError) as exc:
+            self._events.event(
+                "game_command_rejected",
+                request_id=context.envelope.request_id,
+                connection_id=context.connection_id,
+                game_id=request.game_id,
+                command=kind.value,
+                code=exc.code.value,
+            )
             return OutgoingMessage(
                 MessageType.COMMAND_RESULT.value,
                 {"accepted": False, "code": exc.code.value},
+            )
+        if result.accepted:
+            self._events.event(
+                "game_command_accepted",
+                request_id=context.envelope.request_id,
+                connection_id=context.connection_id,
+                game_id=request.game_id,
+                command=kind.value,
+                sequence=result.sequence,
+            )
+        else:
+            self._events.event(
+                "game_command_rejected",
+                request_id=context.envelope.request_id,
+                connection_id=context.connection_id,
+                game_id=request.game_id,
+                command=kind.value,
+                code=result.code,
             )
         return OutgoingMessage(
             MessageType.COMMAND_RESULT.value,

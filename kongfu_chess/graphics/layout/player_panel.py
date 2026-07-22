@@ -39,14 +39,14 @@ class PlayerPanel:
         return (
             [
                 first_name,
-                f"Score: {first_score}",
-                "Moves:",
+                f"{self._settings.score_label}: {first_score}",
+                f"{self._settings.moves_label}:",
                 *first_player_moves[1:],
             ],
             [
                 second_name,
-                f"Score: {second_score}",
-                "Moves:",
+                f"{self._settings.score_label}: {second_score}",
+                f"{self._settings.moves_label}:",
                 *second_player_moves[1:],
             ],
         )

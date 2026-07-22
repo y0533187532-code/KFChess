@@ -42,12 +42,22 @@ class ViewSettings:
     player_names: Mapping[str, str]
     piece_type_names: Mapping[str, str]
     max_move_log_lines: int
+    time_column_header: str
+    move_column_header: str
+    score_label: str
+    moves_label: str
+    rtl: bool
 
     def __init__(
         self,
         player_names: Mapping[str, str] | None = None,
         piece_type_names: Mapping[str, str] | None = None,
         max_move_log_lines: int = DEFAULT_MAX_MOVE_LOG_LINES,
+        time_column_header: str = "Time",
+        move_column_header: str = "Move",
+        score_label: str = "Score",
+        moves_label: str = "Moves",
+        rtl: bool = False,
     ):
         resolved_players = (
             DEFAULT_PLAYER_NAMES if player_names is None else player_names
@@ -73,6 +83,11 @@ class ViewSettings:
             MappingProxyType(dict(resolved_piece_names)),
         )
         object.__setattr__(self, "max_move_log_lines", max_move_log_lines)
+        object.__setattr__(self, "time_column_header", time_column_header)
+        object.__setattr__(self, "move_column_header", move_column_header)
+        object.__setattr__(self, "score_label", score_label)
+        object.__setattr__(self, "moves_label", moves_label)
+        object.__setattr__(self, "rtl", rtl)
 
     @property
     def player_colors(self) -> tuple[str, str]:

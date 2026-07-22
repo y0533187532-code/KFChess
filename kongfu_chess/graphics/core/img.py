@@ -100,12 +100,32 @@ class Img:
         else:
             other_img.img[target_y:target_y + draw_h, target_x:target_x + draw_w] = source
 
-    def put_text(self, txt, x, y, font_size, color=(255, 255, 255, 255), thickness=1):
+    def put_text(
+        self,
+        txt,
+        x,
+        y,
+        font_size,
+        color=(255, 255, 255, 255),
+        thickness=1,
+        *,
+        rtl: bool = False,
+    ):
         if self.img is None:
             raise ValueError("Image not loaded.")
-        cv2.putText(self.img, txt, (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_size,
-                    color, thickness, cv2.LINE_AA)
+        from ..text_display import prepare_opencv_display_text
+
+        display = prepare_opencv_display_text(str(txt), rtl=rtl)
+        cv2.putText(
+            self.img,
+            display,
+            (x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_size,
+            color,
+            thickness,
+            cv2.LINE_AA,
+        )
 
     def show(self):
         if self.img is None:

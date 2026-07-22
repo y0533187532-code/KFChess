@@ -1,7 +1,7 @@
 """Launch the production OpenCV network client."""
 
-from .client_application import run_from_config
+from .client_application import main
 
 
 if __name__ == "__main__":  # pragma: no cover
-    run_from_config()
+    main()

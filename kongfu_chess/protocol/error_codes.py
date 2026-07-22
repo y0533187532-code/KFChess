@@ -50,4 +50,6 @@ class ProtocolErrorCode(str, Enum):
     ACCOUNT_DISABLED = "account_disabled"
     TOKEN_REVOKED = "token_revoked"
     RECONNECT_EXPIRED = "reconnect_expired"
+    CONNECTION_LIMIT_REACHED = "connection_limit_reached"
+    ACTIVE_GAMES_FULL = "active_games_full"
     INTERNAL_ERROR = "internal_error"

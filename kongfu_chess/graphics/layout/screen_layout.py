@@ -43,7 +43,7 @@ def draw_board_on_screen(screen: Img, board: Img) -> None:
     board.draw_on(screen, BOARD_X_PX, BOARD_Y_PX)
 
 
-def draw_status_text(screen: Img, text: str) -> None:
+def draw_status_text(screen: Img, text: str, *, rtl: bool = False) -> None:
     """Draw a short game status line in the header area."""
     screen.put_text(
         text,
@@ -52,6 +52,7 @@ def draw_status_text(screen: Img, text: str) -> None:
         font_size=0.55,
         color=TEXT_COLOR,
         thickness=1,
+        rtl=rtl,
     )
 
 
@@ -68,13 +69,24 @@ def screen_to_board_pixels(pixel_x: int, pixel_y: int) -> tuple[int, int] | None
     return board_x, board_y
 
 
-def draw_side_panel_text(screen: Img, left_lines: list[str], right_lines: list[str]) -> None:
+def draw_side_panel_text(
+    screen: Img,
+    left_lines: list[str],
+    right_lines: list[str],
+    *,
+    time_header: str = "Time",
+    move_header: str = "Move",
+    rtl: bool = False,
+) -> None:
     """Draw text lines inside the left and right side panels."""
     draw_move_table(
         screen,
         x=TABLE_X_PADDING_PX,
         y=HEADER_HEIGHT_PX - 35,
         lines=left_lines,
+        time_header=time_header,
+        move_header=move_header,
+        rtl=rtl,
     )
 
     draw_move_table(
@@ -82,6 +94,9 @@ def draw_side_panel_text(screen: Img, left_lines: list[str], right_lines: list[s
         x=BOARD_X_PX + BOARD_SIZE_PX + BOARD_LABEL_MARGIN_PX + TABLE_X_PADDING_PX,
         y=HEADER_HEIGHT_PX - 35,
         lines=right_lines,
+        time_header=time_header,
+        move_header=move_header,
+        rtl=rtl,
     )
 
 
@@ -168,7 +183,16 @@ def draw_board_coordinates(screen: Img) -> None:
         )
 
 
-def draw_move_table(screen: Img, x: int, y: int, lines: list[str]) -> None:
+def draw_move_table(
+    screen: Img,
+    x: int,
+    y: int,
+    lines: list[str],
+    *,
+    time_header: str = "Time",
+    move_header: str = "Move",
+    rtl: bool = False,
+) -> None:
     """Draw a player move table with Time and Move columns."""
     table_width = SIDE_PANEL_WIDTH_PX - TABLE_X_PADDING_PX * 2
     time_col_width = 105
@@ -193,27 +217,75 @@ def draw_move_table(screen: Img, x: int, y: int, lines: list[str]) -> None:
     )
     _draw_table_grid(screen, x, y, table_width, table_height, time_col_width)
 
-    screen.put_text(title, x=x + table_width // 2 - 45, y=y + 23, font_size=0.55, color=TEXT_COLOR, thickness=2)
-    screen.put_text(score, x=x + table_width // 2 - 35, y=y + 45, font_size=0.45, color=TEXT_COLOR, thickness=1)
+    screen.put_text(
+        title,
+        x=x + table_width // 2 - 45,
+        y=y + 23,
+        font_size=0.55,
+        color=TEXT_COLOR,
+        thickness=2,
+        rtl=rtl,
+    )
+    screen.put_text(
+        score,
+        x=x + table_width // 2 - 35,
+        y=y + 45,
+        font_size=0.45,
+        color=TEXT_COLOR,
+        thickness=1,
+        rtl=rtl,
+    )
     header_y = y + TABLE_TITLE_HEIGHT_PX + 22
-    screen.put_text("Time", x=x + 25, y=header_y, font_size=0.55, color=TEXT_COLOR, thickness=2)
-    screen.put_text("Move", x=x + time_col_width + 30, y=header_y, font_size=0.55, color=TEXT_COLOR, thickness=2)
+    screen.put_text(
+        time_header,
+        x=x + 25,
+        y=header_y,
+        font_size=0.55,
+        color=TEXT_COLOR,
+        thickness=2,
+        rtl=rtl,
+    )
+    screen.put_text(
+        move_header,
+        x=x + time_col_width + 30,
+        y=header_y,
+        font_size=0.55,
+        color=TEXT_COLOR,
+        thickness=2,
+        rtl=rtl,
+    )
 
     row_y = y + TABLE_TITLE_HEIGHT_PX + TABLE_COLUMN_HEADER_HEIGHT_PX + 20
     for index, move_line in enumerate(moves[:14]):
         time_text, move_text = _split_move_line(move_line)
-        screen.put_text(time_text, x=x + 8, y=row_y + index * TABLE_ROW_HEIGHT_PX, font_size=0.5, color=(90, 90, 90, 255), thickness=1)
-        screen.put_text(move_text, x=x + time_col_width + 10, y=row_y + index * TABLE_ROW_HEIGHT_PX, font_size=0.5, color=(90, 90, 90, 255), thickness=1)
+        screen.put_text(
+            time_text,
+            x=x + 8,
+            y=row_y + index * TABLE_ROW_HEIGHT_PX,
+            font_size=0.5,
+            color=(90, 90, 90, 255),
+            thickness=1,
+        )
+        screen.put_text(
+            move_text,
+            x=x + time_col_width + 10,
+            y=row_y + index * TABLE_ROW_HEIGHT_PX,
+            font_size=0.5,
+            color=(90, 90, 90, 255),
+            thickness=1,
+            rtl=rtl,
+        )
 
 
 def _move_lines_from_panel(lines: list[str]) -> list[str]:
-    return [line for line in lines[1:] if line != "Moves:" and not line.startswith("Score:")]
+    if len(lines) <= 3:
+        return []
+    return [line for line in lines[3:] if line]
 
 
 def _score_line_from_panel(lines: list[str]) -> str:
-    for line in lines:
-        if line.startswith("Score:"):
-            return line
+    if len(lines) > 1:
+        return lines[1]
     return "Score: 0"
 
 
@@ -221,9 +293,6 @@ def _split_move_line(line: str) -> tuple[str, str]:
     if " " not in line:
         return "", line
     time_text, rest = line.split(" ", 1)
-    if ": " in rest:
-        _piece_name, move_text = rest.split(": ", 1)
-        return time_text, move_text
     return time_text, rest
 
 

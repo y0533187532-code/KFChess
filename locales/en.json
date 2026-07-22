@@ -45,5 +45,7 @@
   "account_disabled": "This account is unavailable.",
   "token_revoked": "The session was revoked.",
   "reconnect_expired": "The reconnection window has expired.",
+  "connection_limit_reached": "The server connection limit has been reached.",
+  "active_games_full": "The server cannot start another game right now.",
   "internal_error": "An internal server error occurred."
 }

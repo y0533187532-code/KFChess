@@ -15,6 +15,17 @@ class RoomFlow:
         UiAction.ROOM_REFRESH,
         UiAction.ROOM_LEAVE,
     }
+    _ROOM_OPERATIONS = frozenset(
+        {"room_create", "room_join", "room_leave", "room_status"}
+    )
+    _STALE_ROOM_ERRORS = frozenset(
+        {
+            "room_not_found",
+            "room_closed",
+            "unauthorized",
+            "invalid_room_code",
+        }
+    )
 
     def __init__(self, context, *, status_poll_interval_ms: int):
         self._context = context
@@ -75,8 +86,37 @@ class RoomFlow:
         self._schedule_status_poll()
         return True
 
+    def handle_failure(self, operation: str | None, error_code: str) -> bool:
+        if operation not in self._ROOM_OPERATIONS:
+            return False
+        if operation == "room_join" and error_code == "already_in_room":
+            if self._context.session.room is not None:
+                self._context.show(ClientScreen.ROOM_LOBBY)
+            self._context.show_error(error_code)
+            return True
+        if error_code in self._STALE_ROOM_ERRORS:
+            self._stop_polling()
+            self._context.session.clear_room()
+            if operation == "room_leave":
+                self._context.show(ClientScreen.MAIN_MENU)
+            elif self._context.state.screen is ClientScreen.GAME_BOARD:
+                self._context.show(ClientScreen.MAIN_MENU)
+            elif operation == "room_join":
+                self._context.show(ClientScreen.ROOM_ENTRY)
+            else:
+                self._context.show(ClientScreen.ROOM_ENTRY)
+            self._context.show_error(error_code)
+            return True
+        self._context.show_error(error_code)
+        return True
+
     def _submit_join(self) -> None:
-        code = self._context.state.fields["room_code"].upper()
+        code = "".join(
+            character
+            for character in self._context.state.fields["room_code"].upper()
+            if character.isalnum()
+        )
+        self._context.state.fields["room_code"] = code
         expected_length = self._context.constraints.room_code_length
         if len(code) != expected_length or not code.isalnum():
             self._context.show_error("invalid_room_code_local")

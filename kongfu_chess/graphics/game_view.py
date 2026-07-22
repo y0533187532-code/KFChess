@@ -47,6 +47,7 @@ class GameView:
 
     def __init__(self, rest_durations=None, view_settings=None):
         view_settings = ViewSettings() if view_settings is None else view_settings
+        self._view_settings = view_settings
         self._animation_manager = PieceAnimationManager()
         self._positioner = PiecePositioner()
         self._move_log = MoveLog(view_settings)
@@ -102,14 +103,21 @@ class GameView:
         screen = build_screen_canvas()
         draw_board_on_screen(screen, board)
         status_text = self._player_panel.status_text(snapshot)
-        draw_status_text(screen, status_text)
+        draw_status_text(screen, status_text, rtl=self._view_settings.rtl)
         first_player_moves, second_player_moves = self._move_log.lines_by_color()
         left_text, right_text = self._player_panel.side_panel_lines(
             snapshot,
             first_player_moves,
             second_player_moves,
         )
-        draw_side_panel_text(screen, left_text, right_text)
+        draw_side_panel_text(
+            screen,
+            left_text,
+            right_text,
+            time_header=self._view_settings.time_column_header,
+            move_header=self._view_settings.move_column_header,
+            rtl=self._view_settings.rtl,
+        )
         return screen
 
     def _asset_state_for(self, state: PieceState | str) -> str:

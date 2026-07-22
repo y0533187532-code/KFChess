@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
 from .chess_compatibility import CHESS_SEAT_ADAPTER
+from .event_logger import ServerEventLogger
 from .game_mode import GameRole, SeatBoundaryAdapter
 from .room_models import RoomsError, RoomView
 from .routing import OutgoingMessage
@@ -17,10 +18,12 @@ class RoomsHandlers:
         *,
         clock_ms,
         seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
+        events: ServerEventLogger | None = None,
     ):
         self._rooms_service = rooms_service
         self._clock_ms = clock_ms
         self._seat_adapter = seat_adapter
+        self._events = events or ServerEventLogger(None)
 
     def register_routes(self, router) -> None:
         router.register(MessageType.ROOM_CREATE.value, self.create)
@@ -30,31 +33,37 @@ class RoomsHandlers:
 
     def create(self, context) -> OutgoingMessage:
         auth_token = self._payload(context, requires_code=False)["auth_token"]
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._room_message(
                 self._rooms_service.create(auth_token, now_ms=self._clock_ms())
             )
         )
+        self._log_room_event(context, "room_created", outgoing)
+        return outgoing
 
     def join(self, context) -> OutgoingMessage:
         payload = self._payload(context, requires_code=True)
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._room_message(
                 self._rooms_service.join(
                     payload["auth_token"], payload["code"], now_ms=self._clock_ms()
                 )
             )
         )
+        self._log_room_event(context, "room_joined", outgoing)
+        return outgoing
 
     def leave(self, context) -> OutgoingMessage:
         payload = self._payload(context, requires_code=True)
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._room_message(
                 self._rooms_service.leave(
                     payload["auth_token"], payload["code"], now_ms=self._clock_ms()
                 )
             )
         )
+        self._log_room_event(context, "room_left", outgoing)
+        return outgoing
 
     def status(self, context) -> OutgoingMessage:
         payload = self._payload(context, requires_code=True)
@@ -113,3 +122,24 @@ class RoomsHandlers:
         if view.leave_deferred:
             payload["leave_deferred"] = True
         return OutgoingMessage(MessageType.ROOM_STATUS.value, payload)
+
+    def _log_room_event(
+        self, context, event: str, outgoing: OutgoingMessage
+    ) -> None:
+        payload = outgoing.payload
+        fields = {
+            "request_id": context.envelope.request_id,
+            "connection_id": context.connection_id,
+            "accepted": payload.get("accepted"),
+        }
+        if payload.get("code"):
+            fields["code"] = payload["code"]
+        if payload.get("room_id") is not None:
+            fields["room_id"] = payload["room_id"]
+        if payload.get("game_id"):
+            fields["game_id"] = payload["game_id"]
+        if payload.get("role"):
+            fields["role"] = payload["role"]
+        if payload.get("gameplay_started"):
+            self._events.event("room_game_started", **fields)
+        self._events.event(event, **fields)

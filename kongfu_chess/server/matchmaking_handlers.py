@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
 from .chess_compatibility import CHESS_SEAT_ADAPTER
+from .event_logger import ServerEventLogger
 from .game_mode import GameRole, SeatBoundaryAdapter
 from .matchmaking_service import MatchmakingError, MatchmakingStatus
 from .routing import OutgoingMessage
@@ -17,10 +18,12 @@ class MatchmakingHandlers:
         *,
         clock_ms,
         seat_adapter: SeatBoundaryAdapter = CHESS_SEAT_ADAPTER,
+        events: ServerEventLogger | None = None,
     ):
         self._matchmaking_service = matchmaking_service
         self._clock_ms = clock_ms
         self._seat_adapter = seat_adapter
+        self._events = events or ServerEventLogger(None)
 
     def register_routes(self, router) -> None:
         router.register(MessageType.PLAY_QUEUE_JOIN.value, self.join)
@@ -29,13 +32,15 @@ class MatchmakingHandlers:
 
     def join(self, context) -> OutgoingMessage:
         auth_token = self._auth_token(context)
-        return self._execute(
+        outgoing = self._execute(
             lambda: self._status_message(
                 self._matchmaking_service.join(
                     auth_token, now_ms=self._clock_ms()
                 )
             )
         )
+        self._log_queue_event(context, "matchmaking_join", outgoing)
+        return outgoing
 
     def cancel(self, context) -> OutgoingMessage:
         auth_token = self._auth_token(context)
@@ -113,6 +118,12 @@ class MatchmakingHandlers:
         match = status.match
         if match is None:
             raise ValueError("MATCH_FOUND status requires a match view")
+        self._events.event(
+            "match_created",
+            user_id=status.user_id,
+            game_id=match.game_id,
+            ranked=match.ranked,
+        )
         return OutgoingMessage(
             MessageType.PLAY_MATCH_FOUND.value,
             {
@@ -133,3 +144,27 @@ class MatchmakingHandlers:
                 },
             },
         )
+
+    def _log_queue_event(
+        self, context, event_prefix: str, outgoing: OutgoingMessage
+    ) -> None:
+        payload = outgoing.payload
+        fields = {
+            "request_id": context.envelope.request_id,
+            "connection_id": context.connection_id,
+            "accepted": payload.get("accepted"),
+        }
+        if payload.get("code"):
+            fields["code"] = payload["code"]
+        if payload.get("user_id") is not None:
+            fields["user_id"] = payload["user_id"]
+        if payload.get("state"):
+            fields["state"] = payload["state"]
+        if payload.get("game_id"):
+            fields["game_id"] = payload["game_id"]
+        if payload.get("state") == "timed_out":
+            self._events.event("matchmaking_timeout", **fields)
+            return
+        if payload.get("state") == "match_found":
+            return
+        self._events.event(event_prefix, **fields)

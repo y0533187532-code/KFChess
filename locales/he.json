@@ -45,5 +45,7 @@
   "account_disabled": "החשבון אינו זמין.",
   "token_revoked": "ההתחברות בוטלה.",
   "reconnect_expired": "חלון החיבור מחדש הסתיים.",
+  "connection_limit_reached": "השרת הגיע למגבלת החיבורים.",
+  "active_games_full": "השרת לא יכול להתחיל משחק נוסף כרגע.",
   "internal_error": "אירעה תקלה פנימית בשרת."
 }

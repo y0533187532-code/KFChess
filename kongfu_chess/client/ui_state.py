@@ -30,6 +30,9 @@ class UiAction(str, Enum):
     ROOM_CANCEL = "room_cancel"
     ROOM_REFRESH = "room_refresh"
     ROOM_LEAVE = "room_leave"
+    GAME_LEAVE = "game_leave"
+    GAME_LEAVE_CONFIRM = "game_leave_confirm"
+    GAME_LEAVE_CANCEL = "game_leave_cancel"
     LOGOUT = "logout"
 
 
@@ -73,6 +76,7 @@ class ClientUiState:
     game_reconnect_deadline_ms: int | None = None
     game_selected_cell: tuple[int, int] | None = None
     game_selected_piece_id: int | None = None
+    game_leave_confirm_pending: bool = False
 
     def display_value(self, field_name: str) -> str:
         value = self.fields[field_name]
