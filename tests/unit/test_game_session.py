@@ -174,3 +174,153 @@ def test_pause_gate_rejects_mutations_without_calling_handler_or_advancing_seque
     assert resumed.accepted is True
     assert resumed.sequence == 4
     assert calls == 1
+
+
+def test_request_cache_size_must_be_positive():
+    with pytest.raises(ValueError, match="request_cache_size must be positive"):
+        GameSession(
+            "game-1",
+            {},
+            initial_sequence=0,
+            request_cache_size=0,
+        )
+
+
+def test_pause_and_resume_raise_after_close():
+    async def scenario():
+        session = GameSession(
+            "game-1", {}, initial_sequence=0, request_cache_size=8
+        )
+        session.start()
+        await session.close()
+        return session
+
+    session = run(scenario())
+    with pytest.raises(SessionClosedError):
+        session.pause()
+    with pytest.raises(SessionClosedError):
+        session.resume()
+
+
+def test_start_raises_after_close():
+    async def scenario():
+        session = GameSession(
+            "game-1", {}, initial_sequence=0, request_cache_size=8
+        )
+        session.start()
+        await session.close()
+        return session
+
+    session = run(scenario())
+    with pytest.raises(SessionClosedError):
+        session.start()
+
+
+def test_submit_before_start_raises():
+    async def scenario():
+        session = GameSession(
+            "game-1", {}, initial_sequence=0, request_cache_size=8
+        )
+        with pytest.raises(RuntimeError, match="must be started"):
+            await session.submit(SessionCommand("tick", "request-1"))
+
+    run(scenario())
+
+
+def test_handler_exception_propagates_to_caller():
+    async def scenario():
+        def broken(_command):
+            raise ValueError("boom")
+
+        session = GameSession(
+            "game-1",
+            {"tick": broken},
+            initial_sequence=0,
+            request_cache_size=8,
+        )
+        session.start()
+        with pytest.raises(ValueError, match="boom"):
+            await session.submit(SessionCommand("tick", "request-1"))
+        await session.close()
+
+    run(scenario())
+
+
+def test_sequence_changed_callback_runs_for_mutations():
+    async def scenario():
+        observed = []
+
+        def handler(_command):
+            return HandlerResult(True, True, "ok", {"tick": 1})
+
+        session = GameSession(
+            "game-1",
+            {"tick": handler},
+            initial_sequence=4,
+            request_cache_size=8,
+            on_sequence_changed=lambda game_id, sequence, payload: observed.append(
+                (game_id, sequence, payload)
+            ),
+        )
+        session.start()
+        result = await session.submit(SessionCommand("tick", "request-1"))
+        await session.close()
+        return observed, result
+
+    observed, result = run(scenario())
+
+    assert result.sequence == 5
+    assert observed == [("game-1", 5, {"tick": 1})]
+
+
+def test_async_sequence_changed_callback_is_awaited():
+    async def scenario():
+        observed = []
+
+        async def on_sequence_changed(game_id, sequence, payload):
+            await asyncio.sleep(0)
+            observed.append((game_id, sequence, payload))
+
+        def handler(_command):
+            return HandlerResult(True, True, "ok")
+
+        session = GameSession(
+            "game-1",
+            {"tick": handler},
+            initial_sequence=0,
+            request_cache_size=8,
+            on_sequence_changed=on_sequence_changed,
+        )
+        session.start()
+        await session.submit(SessionCommand("tick", "request-1"))
+        await session.close()
+        return observed
+
+    observed = run(scenario())
+    assert observed == [("game-1", 1, {})]
+
+
+def test_completed_request_cache_evicts_oldest_entries():
+    async def scenario():
+        calls = []
+
+        def handler(command):
+            calls.append(command.request_id)
+            return HandlerResult(True, True, "ok")
+
+        session = GameSession(
+            "game-1",
+            {"tick": handler},
+            initial_sequence=0,
+            request_cache_size=2,
+        )
+        session.start()
+        await session.submit(SessionCommand("tick", "request-1"))
+        await session.submit(SessionCommand("tick", "request-2"))
+        await session.submit(SessionCommand("tick", "request-3"))
+        await session.submit(SessionCommand("tick", "request-1"))
+        await session.close()
+        return calls
+
+    calls = run(scenario())
+    assert calls == ["request-1", "request-2", "request-3", "request-1"]

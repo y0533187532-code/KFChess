@@ -8,7 +8,7 @@ from queue import Empty
 from kongfu_chess.client import WebSocketClientTransport
 from kongfu_chess.infrastructure.configuration import ConfigProvider
 from kongfu_chess.protocol import EnvelopePolicy, MessageEnvelope, MessageType
-from kongfu_chess.server.server_application import (
+from kongfu_chess.server import (
     build_server_stack,
     shutdown_stack,
 )

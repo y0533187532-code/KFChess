@@ -1,4 +1,4 @@
-from kongfu_chess.server.password_hasher import PasswordHasher
+from kongfu_chess.server import PasswordHasher
 
 
 def hasher():

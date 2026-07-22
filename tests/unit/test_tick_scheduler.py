@@ -62,7 +62,13 @@ def test_tick_scheduler_submits_tick_while_motion_is_active():
         scheduler = TickScheduler(tick_interval_ms=10)
         scheduler.start("game-1", session, lambda: needs_advancement(engine))
 
-        await asyncio.sleep(1.8)
+        deadline = asyncio.get_running_loop().time() + 10.0
+        while asyncio.get_running_loop().time() < deadline:
+            if engine.snapshot().pieces[0].col == 1:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            pytest.fail("timed out waiting for scheduled ticks to finish the move")
         scheduler.stop("game-1")
         await asyncio.sleep(0)
 

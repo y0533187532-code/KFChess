@@ -12,7 +12,7 @@ import websockets
 
 from kongfu_chess.client import WebSocketClientTransport
 from kongfu_chess.protocol import EnvelopePolicy, MessageType
-from kongfu_chess.server.server_application import (
+from kongfu_chess.server import (
     build_server_stack,
     shutdown_stack,
 )
@@ -388,7 +388,7 @@ def test_database_backup_writes_file(tmp_path):
         config.database.backup_directory,
         timestamp_ms=1000,
     )
-    from kongfu_chess.server.event_logger import ServerEventLogger
+    from kongfu_chess.server.core import ServerEventLogger
 
     ServerEventLogger(stack.logger).event("backup_completed", path=str(backup_path))
     assert backup_path.exists()

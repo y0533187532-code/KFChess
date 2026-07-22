@@ -27,8 +27,11 @@ from kongfu_chess.server import (
     build_game_session,
     standard_starting_board,
 )
-from kongfu_chess.server.game_mode import PLAY_GAME_MODE
-from kongfu_chess.server.matchmaking_service import PlayMatch, PlaySeat
+from kongfu_chess.server import (
+    PLAY_GAME_MODE,
+    PlayMatch,
+    PlaySeat,
+)
 
 
 KING_MOVE_MS = DEFAULT_MOVE_DURATION_MS["K"]

@@ -1,77 +1,78 @@
 """Authoritative server application components."""
 
-from .game_session import (
-    CommandResult,
-    GameSession,
-    HandlerResult,
-    SessionClosedError,
-    SessionCommand,
-    SessionCommandType,
-)
-from .connections import ConnectionRegistry
-from .auth_service import (
+from .app import MessageRouter, OutgoingMessage, RequestContext, ServerStack, build_server_stack, run_from_config, shutdown_stack
+from .auth import (
     AuthError,
+    AuthHandlers,
     AuthPrincipal,
     AuthService,
     AuthenticatedSession,
+    PasswordHasher,
     RegisteredAccount,
     build_auth_service,
 )
-from .password_hasher import PasswordHasher
-from .auth_handlers import AuthHandlers
-from .elo_service import EloOutcome, EloResult, EloService
-from .chess_compatibility import (
+from .core import (
     CHESS_SEAT_ADAPTER,
     ChessColor,
     ChessOutcome,
     ChessSeatAdapter,
-)
-from .game_mode import (
-    PLAY_GAME_MODE,
-    ROOM_GAME_MODE,
     GameMode,
     GameModeConfig,
     GameRole,
     MatchOutcome,
+    PLAY_GAME_MODE,
     PlayerSeat,
+    ROOM_GAME_MODE,
     SeatAssignment,
     SeatAssignmentPolicy,
     SeatBoundaryAdapter,
 )
-from .gameplay_handlers import GameplayHandlers
-from .game_lifecycle_models import (
-    GameLifecycleError,
-    GameLifecycleState,
-    GameLifecycleView,
-    LifecyclePlayer,
-)
-from .game_lifecycle_authorization import GameLifecycleAuthorization
-from .game_lifecycle_coordinator import GameLifecycleCoordinator
-from .game_lifecycle_reconnect_workflow import GameLifecycleReconnectWorkflow
-from .game_lifecycle_registration import GameLifecycleRegistration
-from .game_lifecycle_terminal_workflow import GameLifecycleTerminalWorkflow
-from .game_lifecycle_view_factory import GameLifecycleViewFactory
-from .game_result_finalizer import GameResultFinalizer
-from .reconnect_policy import ReconnectAction, ReconnectDecision, ReconnectPolicy
-from .game_lifecycle_service import GameLifecycleService, GameOverLifecycleSubscriber
-from .game_lifecycle_handlers import GameLifecycleHandlers
-from .gameplay_service import (
+from .gameplay import (
     BoardCoordinate,
+    CommandResult,
+    GameRuntimeFactory,
+    GameSession,
+    GameSessionRegistry,
     GameSnapshotRequest,
     GameplayCommandService,
     GameplayError,
+    GameplayHandlers,
     GameplayRequest,
-    GameSessionRegistry,
+    HandlerResult,
     NetworkGameAdapter,
+    SessionClosedError,
+    SessionCommand,
+    SessionCommandType,
+    TickScheduler,
     build_game_session,
+    needs_advancement,
+    standard_starting_board,
 )
-from .game_connection_registry import GameConnectionRegistry
-from .game_runtime_factory import GameRuntimeFactory, standard_starting_board
-from .server_application import ServerStack, build_server_stack, run_from_config
-from .snapshot_push_service import SnapshotPushService
-from .tick_scheduler import TickScheduler, needs_advancement
-from .matchmaking_service import (
+from .lifecycle import (
+    GameLifecycleAuthorization,
+    GameLifecycleCoordinator,
+    GameLifecycleError,
+    GameLifecycleHandlers,
+    GameLifecycleReconnectWorkflow,
+    GameLifecycleRegistration,
+    GameLifecycleService,
+    GameLifecycleState,
+    GameLifecycleTerminalWorkflow,
+    GameLifecycleView,
+    GameLifecycleViewFactory,
+    GameOverLifecycleSubscriber,
+    GameResultFinalizer,
+    LifecyclePlayer,
+    ReconnectAction,
+    ReconnectDecision,
+    ReconnectPolicy,
+)
+from .matchmaking import (
+    EloOutcome,
+    EloResult,
+    EloService,
     MatchmakingError,
+    MatchmakingHandlers,
     MatchmakingService,
     MatchmakingStatus,
     PlayMatch,
@@ -79,15 +80,23 @@ from .matchmaking_service import (
     PlaySeat,
     QueueTicket,
 )
-from .matchmaking_handlers import MatchmakingHandlers
-from .rooms_handlers import RoomsHandlers
-from .room_models import RoomStatus, RoomsError, RoomView
-from .rooms_service import RoomsService
-from .room_code_policy import RoomCodePolicy
-from .room_seating_policy import RoomAssignment, RoomSeatingPolicy
-from .room_view_factory import RoomViewFactory
-from .routing import MessageRouter, OutgoingMessage, RequestContext
-from .websocket_gateway import WebSocketGateway
+from .rooms import (
+    RoomAssignment,
+    RoomCodePolicy,
+    RoomSeatingPolicy,
+    RoomStatus,
+    RoomView,
+    RoomViewFactory,
+    RoomsError,
+    RoomsHandlers,
+    RoomsService,
+)
+from .transport import (
+    ConnectionRegistry,
+    GameConnectionRegistry,
+    SnapshotPushService,
+    WebSocketGateway,
+)
 
 __all__ = [
     "CommandResult",
@@ -167,6 +176,7 @@ __all__ = [
     "build_game_session",
     "build_server_stack",
     "run_from_config",
+    "shutdown_stack",
     "SessionClosedError",
     "SessionCommand",
     "SessionCommandType",

@@ -11,8 +11,7 @@ from kongfu_chess.infrastructure.configuration import ConfigProvider
 from kongfu_chess.persistence.game_lifecycle_repository import GameLifecycleRepository
 from kongfu_chess.persistence.database import SqliteDatabase
 from kongfu_chess.persistence.user_repository import UserRepository
-from kongfu_chess.server.connections import ConnectionRegistry
-from kongfu_chess.server.server_application import build_server_stack
+from kongfu_chess.server import ConnectionRegistry, build_server_stack
 
 
 def test_connection_registry_enforces_limit():

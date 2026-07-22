@@ -26,7 +26,7 @@ class Dispatcher:
 
 def make_controller(*, localizer=None):
     dispatcher = Dispatcher()
-    ids = iter(f"request-{index}" for index in range(30))
+    ids = iter(f"request-{index}" for index in range(100))
     controller = ClientController(
         ClientSessionState(),
         ClientMessageFactory(
@@ -154,10 +154,18 @@ def snapshot_payload(**overrides):
                 "rest_remaining_ms": None,
             },
             {
+                "row": 6,
+                "col": 1,
+                "token": "wP",
+                "piece_id": 8,
+                "state": "idle",
+                "rest_remaining_ms": None,
+            },
+            {
                 "row": 1,
                 "col": 0,
                 "token": "bP",
-                "piece_id": 8,
+                "piece_id": 9,
                 "state": "idle",
                 "rest_remaining_ms": None,
             },
@@ -893,3 +901,316 @@ def test_sequence_gap_triggers_resync():
 
     assert len(dispatcher.sent) == sent + 1
     assert dispatcher.sent[-1].type == "resync_request"
+
+
+def test_network_loss_submits_game_reconnect():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent = len(dispatcher.sent)
+
+    assert controller.handle_transport_failure("missing-request", "network_error") is None
+    assert len(dispatcher.sent) == sent + 1
+    reconnect = dispatcher.sent[-1]
+    assert reconnect.type == "game_reconnect"
+    assert reconnect.payload["game_id"] == "game-1"
+
+
+def test_lifecycle_push_forfeit_triggers_rating_refresh():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent = len(dispatcher.sent)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.GAME_FORFEIT.value,
+                "request_id": "push-forfeit",
+                "timestamp_ms": 1200,
+                "payload": {
+                    "accepted": True,
+                    "code": "ok",
+                    "game_id": "game-1",
+                    "state": "ENDED",
+                    "reason": "forfeit",
+                    "winner_seat": "SECOND_PLAYER",
+                },
+            },
+            POLICY,
+        )
+    )
+
+    assert controller.state.game_lifecycle_state == "ENDED"
+    new_requests = dispatcher.sent[sent:]
+    assert any(item.type == "validate_auth_request" for item in new_requests)
+
+
+def test_disconnect_countdown_push_keeps_game_paused():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.DISCONNECT_COUNTDOWN.value,
+                "request_id": "push-countdown",
+                "timestamp_ms": 1200,
+                "payload": {
+                    "accepted": True,
+                    "code": "ok",
+                    "game_id": "game-1",
+                    "state": "PAUSED_FOR_RECONNECT",
+                    "reconnect_deadline_ms": 25000,
+                    "remaining_ms": 15000,
+                },
+            },
+            POLICY,
+        )
+    )
+
+    assert controller.state.game_lifecycle_state == "PAUSED_FOR_RECONNECT"
+    assert controller.state.reconnect_seconds_remaining == 23
+    assert all(item.type != "resync_request" for item in dispatcher.sent[-1:])
+
+
+def test_controller_disconnect_active_game_sends_game_disconnect():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent = len(dispatcher.sent)
+
+    controller.disconnect_active_game()
+
+    assert len(dispatcher.sent) == sent + 1
+    assert dispatcher.sent[-1].type == "game_disconnect"
+
+
+def test_stale_client_state_on_move_resubmits_snapshot():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    controller.handle_board_cell(6, 0)
+    controller.handle_board_cell(4, 0)
+    move = dispatcher.sent[-1]
+    sent = len(dispatcher.sent)
+
+    controller.handle_response(
+        response(
+            move,
+            "command_result",
+            {"accepted": False, "code": "stale_client_state"},
+        )
+    )
+
+    assert controller.state.inline_message == "stale_client_state"
+    assert len(dispatcher.sent) == sent + 1
+    assert dispatcher.sent[-1].type == "resync_request"
+
+
+def test_invalid_snapshot_response_shows_error_and_reschedules_poll():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.tick(5000)
+    snapshot_request = dispatcher.sent[-1]
+    assert snapshot_request.type == "resync_request"
+
+    controller.handle_response(
+        response(snapshot_request, "snapshot", {"board_width": 8})
+    )
+
+    assert controller.state.inline_message == "The server returned an invalid game state."
+    controller.tick(6000)
+    assert dispatcher.sent[-1].type == "resync_request"
+
+
+def test_push_without_snapshot_triggers_resync():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent = len(dispatcher.sent)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.STATE_UPDATE.value,
+                "request_id": "push-empty",
+                "timestamp_ms": 1200,
+                "payload": {"game_id": "game-1", "sequence": 2},
+            },
+            POLICY,
+        )
+    )
+
+    assert len(dispatcher.sent) == sent + 1
+    assert dispatcher.sent[-1].type == "resync_request"
+
+
+def test_duplicate_sequence_push_is_ignored():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    controller.state.game_sequence = 5
+    sent = len(dispatcher.sent)
+
+    controller.handle_push(
+        MessageEnvelope.from_mapping(
+            {
+                "protocol_version": "1.0",
+                "type": MessageType.STATE_UPDATE.value,
+                "request_id": "push-old",
+                "timestamp_ms": 1200,
+                "payload": {
+                    "game_id": "game-1",
+                    "sequence": 4,
+                    "snapshot": snapshot_payload(),
+                },
+            },
+            POLICY,
+        )
+    )
+
+    assert len(dispatcher.sent) == sent
+    assert controller.state.game_sequence == 5
+
+
+def test_tick_schedules_snapshot_and_lifecycle_polls():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_lifecycle_status",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ACTIVE",
+            },
+        )
+    )
+    sent = len(dispatcher.sent)
+
+    controller.tick(5000)
+
+    new_requests = dispatcher.sent[sent:]
+    assert any(item.type == "resync_request" for item in new_requests)
+    assert any(item.type == "game_lifecycle_status" for item in new_requests)
+
+
+def test_board_click_reselects_own_piece():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    controller.handle_board_cell(6, 0)
+    assert controller.state.game_selected_piece_id == 7
+
+    controller.handle_board_cell(6, 1)
+    assert controller.state.game_selected_piece_id == 8
+    assert controller.state.game_selected_cell == (6, 1)
+
+
+def test_board_click_on_empty_square_clears_selection():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    controller.handle_board_cell(6, 0)
+    sent = len(dispatcher.sent)
+
+    controller.handle_board_cell(4, 4)
+
+    assert controller.state.game_selected_piece_id is None
+    assert len(dispatcher.sent) == sent + 1
+    assert dispatcher.sent[-1].type == "move_request"
+
+
+def test_terminal_game_over_suppresses_move_error_noise():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_over",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ENDED",
+                "winner_seat": "FIRST_PLAYER",
+            },
+        )
+    )
+    controller.tick(5000)
+    move_poll = dispatcher.sent[-1]
+    controller.handle_response(
+        response(move_poll, "command_result", {"accepted": False, "code": "game_paused"})
+    )
+
+    assert controller.state.inline_message == "You won the game."
+
+
+def test_reconnect_success_resubmits_snapshot():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent = len(dispatcher.sent)
+    assert controller.handle_transport_failure("missing-request", "network_error") is None
+    reconnect = dispatcher.sent[-1]
+
+    controller.handle_response(
+        response(
+            reconnect,
+            "game_lifecycle_status",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ACTIVE",
+            },
+        )
+    )
+
+    assert len(dispatcher.sent) == sent + 2
+    assert dispatcher.sent[-1].type == "resync_request"
+
+
+def test_spectator_room_payload_bootstraps_snapshot_sequence():
+    controller, dispatcher = make_controller()
+    authenticate(controller, dispatcher)
+    controller.handle_action(UiAction.ROOM)
+    controller.state.fields["room_code"] = "ABC234"
+    controller.handle_action(UiAction.ROOM_JOIN)
+    joined = dispatcher.sent[-1]
+    payload = room_payload(
+        status="ACTIVE",
+        role="SPECTATOR",
+        seat=None,
+        color=None,
+        game_token="spectator-token",
+        player_count=2,
+        spectator_count=1,
+        gameplay_started=True,
+        snapshot=snapshot_payload(),
+    )
+    controller.handle_response(response(joined, "room_status", payload))
+
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+    assert controller.state.game_snapshot is not None
+
+
+def test_leave_after_terminal_game_over_refreshes_rating():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_over",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ENDED",
+                "winner_seat": "FIRST_PLAYER",
+            },
+        )
+    )
+    refresh = dispatcher.sent[-1]
+    assert refresh.type == "validate_auth_request"
+
+    controller.handle_action(UiAction.GAME_LEAVE)
+    assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.session.game is None
