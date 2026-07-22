@@ -19,6 +19,10 @@ class ClientFlowContext:
         self._pending: dict[str, str] = {}
         self._foreground_pending: set[str] = set()
 
+    @property
+    def dispatcher(self):
+        return self._dispatcher
+
     def submit(
         self,
         envelope: MessageEnvelope,
@@ -27,8 +31,8 @@ class ClientFlowContext:
         show_loading: bool = True,
     ) -> None:
         self._pending[envelope.request_id] = operation
-        self.state.inline_message = None
         if show_loading:
+            self.state.inline_message = None
             self._foreground_pending.add(envelope.request_id)
             self.state.loading = True
         self._dispatcher.submit(envelope)

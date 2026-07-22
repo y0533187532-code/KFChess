@@ -96,6 +96,16 @@ class ClientMessageFactory:
             game_id,
         )
 
+    def game_resign(
+        self, auth_token: str, game_token: str, game_id: str
+    ) -> MessageEnvelope:
+        return self._game_authenticated(
+            MessageType.GAME_RESIGN,
+            auth_token,
+            game_token,
+            game_id,
+        )
+
     def game_reconnect(
         self, auth_token: str, game_token: str, game_id: str
     ) -> MessageEnvelope:

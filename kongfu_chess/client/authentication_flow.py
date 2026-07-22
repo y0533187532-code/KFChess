@@ -11,7 +11,7 @@ class AuthenticationFlow:
     _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
     _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     _PHONE_PATTERN = re.compile(r"^\+?[0-9]{7,15}$")
-    _OPERATIONS = {"login", "register", "logout", "validate_auth"}
+    _OPERATIONS = {"login", "register", "logout", "validate_auth", "refresh_rating"}
     _ACTIONS = {
         UiAction.SHOW_LOGIN,
         UiAction.SHOW_REGISTER,
@@ -62,6 +62,8 @@ class AuthenticationFlow:
         elif operation == "validate_auth":
             self._context.session.refresh_principal(payload)
             self._context.show(ClientScreen.MAIN_MENU)
+        elif operation == "refresh_rating":
+            self._context.session.refresh_principal(payload)
         else:
             self._context.session.clear()
             self._context.show(ClientScreen.LOGIN)
@@ -73,6 +75,8 @@ class AuthenticationFlow:
         if operation == "validate_auth":
             self._context.session.clear()
             self._context.show(ClientScreen.LOGIN)
+        elif operation == "refresh_rating":
+            return True
         self.clear_password_for(operation)
         self._context.show_error(error_code)
         return True

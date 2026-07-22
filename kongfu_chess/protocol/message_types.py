@@ -21,6 +21,7 @@ class MessageType(str, Enum):
     ROOM_LEAVE = "room_leave"
     ROOM_STATUS = "room_status"
     GAME_DISCONNECT = "game_disconnect"
+    GAME_RESIGN = "game_resign"
     GAME_RECONNECT = "game_reconnect"
     GAME_LIFECYCLE_STATUS = "game_lifecycle_status"
     DISCONNECT_COUNTDOWN = "disconnect_countdown"

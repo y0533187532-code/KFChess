@@ -104,6 +104,17 @@ class GameLifecycleRepository:
             ).fetchone()
         return row is not None
 
+    def count_live_games(self) -> int:
+        with self._database.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM game_lifecycles
+                WHERE state NOT IN ('ENDED', 'CANCELLED', 'INTERRUPTED')
+                """
+            ).fetchone()
+        return int(row[0])
+
     def players(self, game_id: str) -> tuple[GameLifecyclePlayerRecord, ...]:
         with self._database.transaction() as connection:
             rows = connection.execute(

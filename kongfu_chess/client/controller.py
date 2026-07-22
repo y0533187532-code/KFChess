@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..protocol import MessageEnvelope, MessageType
 from .authentication_flow import AuthenticationFlow
+from .client_logger import ClientEventLogger
 from .flow_context import ClientFlowContext
 from .gameplay_flow import GameplayFlow
 from .matchmaking_flow import MatchmakingFlow
@@ -31,10 +32,12 @@ class ClientController:
         status_poll_interval_ms: int = 1000,
         snapshot_poll_interval_ms: int = 1000,
         active_snapshot_poll_interval_ms: int = 200,
+        events: ClientEventLogger | None = None,
     ):
         self._context = ClientFlowContext(
             session, messages, dispatcher, localizer, constraints
         )
+        self._events = events or ClientEventLogger(None)
         self._authentication = AuthenticationFlow(self._context)
         self._matchmaking = MatchmakingFlow(
             self._context,
@@ -97,6 +100,8 @@ class ClientController:
         if self.state.loading:
             return
         normalized_action = UiAction(action)
+        if self._gameplay.handle_action(normalized_action):
+            return
         for flow in self._action_flows:
             if flow.handle_action(normalized_action):
                 return
@@ -123,7 +128,15 @@ class ClientController:
             return
         if envelope.type == MessageType.ERROR.value or payload.get("accepted") is False:
             error_code = str(payload.get("code", "internal_error"))
+            self._events.event(
+                "client_request_failed",
+                request_id=envelope.request_id,
+                operation=operation,
+                code=error_code,
+            )
             if self._gameplay.handle_failure(operation, error_code):
+                return
+            if self._rooms.handle_failure(operation, error_code):
                 return
             if not self._authentication.handle_failure(operation, error_code):
                 self._context.show_error(error_code)
@@ -143,9 +156,17 @@ class ClientController:
         self, request_id: str, error_code: str = "network_error"
     ) -> None:
         operation = self._context.complete(request_id)
+        self._events.event(
+            "client_transport_failure",
+            request_id=request_id,
+            operation=operation,
+            code=error_code,
+        )
         if error_code == "network_error" and self._gameplay.handle_network_loss():
             return
         if self._gameplay.handle_failure(operation, error_code):
+            return
+        if self._rooms.handle_failure(operation, error_code):
             return
         if not self._authentication.handle_failure(operation, error_code):
             self._context.show_error(error_code)

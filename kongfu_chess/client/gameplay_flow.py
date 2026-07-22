@@ -8,7 +8,7 @@ from ..protocol import (
     MessageType,
     deserialize_game_snapshot,
 )
-from .ui_state import ClientScreen
+from .ui_state import ClientScreen, UiAction
 
 
 class GameplayFlow:
@@ -42,6 +42,46 @@ class GameplayFlow:
         self._last_push_ms: int | None = None
         self._push_quiet_ms: int = 500
         self._reconnect_pending = False
+
+    def handle_action(self, action: UiAction) -> bool:
+        if action is UiAction.GAME_LEAVE:
+            self.request_leave_game()
+            return True
+        if action is UiAction.GAME_LEAVE_CONFIRM:
+            self.leave_game(confirmed=True)
+            return True
+        if action is UiAction.GAME_LEAVE_CANCEL:
+            self.leave_game(confirmed=False)
+            return True
+        return False
+
+    def request_leave_game(self) -> None:
+        state = self._context.state
+        snapshot = state.game_snapshot
+        lifecycle = state.game_lifecycle_state
+        if lifecycle in self._TERMINAL_STATES or (
+            snapshot is not None and snapshot.game_over
+        ):
+            self.leave_game(confirmed=True)
+            return
+        state.game_leave_confirm_pending = True
+
+    def leave_game(self, *, confirmed: bool) -> None:
+        state = self._context.state
+        if not confirmed:
+            state.game_leave_confirm_pending = False
+            return
+        state.game_leave_confirm_pending = False
+        game = self._context.session.game
+        if game is None:
+            return
+        mode = game.mode
+        ranked = game.ranked
+        lifecycle = state.game_lifecycle_state
+        was_terminal = lifecycle in self._TERMINAL_STATES
+        if game.role == "PLAYER" and not was_terminal:
+            self.resign_active_game()
+        self._navigate_after_game(mode, ranked=ranked, refresh_rating=was_terminal)
 
     def activate_if_ready(self) -> None:
         game = self._context.session.game
@@ -95,16 +135,21 @@ class GameplayFlow:
             and self._next_snapshot_poll_ms is not None
             and now_ms >= self._next_snapshot_poll_ms
         ):
-            self._submit_snapshot()
+            snapshot = state.game_snapshot
+            if snapshot is None or not snapshot.game_over:
+                self._submit_snapshot()
         game = self._context.session.game
         if (
             game is not None
             and game.role == "PLAYER"
+            and state.game_lifecycle_state not in self._TERMINAL_STATES
             and not self._lifecycle_pending
             and self._next_lifecycle_poll_ms is not None
             and now_ms >= self._next_lifecycle_poll_ms
         ):
-            self._submit_lifecycle_status()
+            snapshot = state.game_snapshot
+            if snapshot is None or not snapshot.game_over:
+                self._submit_lifecycle_status()
 
     def handle_board_cell(self, row: int, col: int) -> None:
         state = self._context.state
@@ -117,6 +162,9 @@ class GameplayFlow:
             or game.role != "PLAYER"
             or game.color is None
             or self._command_pending
+            or state.game_leave_confirm_pending
+            or state.game_lifecycle_state in self._TERMINAL_STATES
+            or snapshot.game_over
         ):
             return
         if state.game_lifecycle_state != "ACTIVE":
@@ -271,6 +319,26 @@ class GameplayFlow:
         except OSError:
             return
 
+    def resign_active_game(self) -> None:
+        game = self._context.session.game
+        state = self._context.state
+        if (
+            game is None
+            or game.role != "PLAYER"
+            or state.game_lifecycle_state in self._TERMINAL_STATES
+        ):
+            return
+        try:
+            self._context.dispatcher.send_immediate(
+                self._context.messages.game_resign(
+                    self._context.session.require_auth_token(),
+                    game.game_token,
+                    game.game_id,
+                )
+            )
+        except OSError:
+            return
+
     def stop_room_runtime(self) -> None:
         self._stop()
 
@@ -309,6 +377,24 @@ class GameplayFlow:
         return True
 
     def handle_failure(self, operation: str | None, code: str) -> bool:
+        state = self._context.state
+        snapshot = state.game_snapshot
+        if (
+            state.game_lifecycle_state in self._TERMINAL_STATES
+            or (snapshot is not None and snapshot.game_over)
+        ):
+            if operation == "game_snapshot":
+                self._snapshot_pending = False
+            elif operation == "game_lifecycle":
+                self._lifecycle_pending = False
+            elif operation in {"game_move", "game_jump"}:
+                self._command_pending = False
+                self._clear_selection()
+            elif operation == "game_reconnect":
+                self._reconnect_pending = False
+            else:
+                return False
+            return True
         if operation == "game_snapshot":
             self._snapshot_pending = False
             self._schedule_snapshot_poll()
@@ -378,10 +464,7 @@ class GameplayFlow:
         if game is None:
             return
         message_key = self._outcome_message(lifecycle_state, payload, game.seat)
-        mode = game.mode
-        self._stop()
-        self._context.session.clear_game()
-        if mode == "ROOM" and self._context.session.room is not None:
+        if game.mode == "ROOM" and self._context.session.room is not None:
             room_status = {
                 "ENDED": "ENDED",
                 "CANCELLED": "CLOSED",
@@ -390,10 +473,38 @@ class GameplayFlow:
             self._context.session.update_room_status(
                 room_status, gameplay_started=False
             )
+        self._pause_runtime()
+        state = self._context.state
+        state.game_lifecycle_state = lifecycle_state
+        state.game_leave_confirm_pending = False
+        state.screen = ClientScreen.GAME_BOARD
+        self._context.show_message(message_key)
+        self._refresh_rating_if_needed(mode=game.mode, ranked=game.ranked)
+
+    def _navigate_after_game(
+        self, mode: str, *, ranked: bool, refresh_rating: bool = False
+    ) -> None:
+        self._stop()
+        self._context.session.clear_game()
+        if refresh_rating:
+            self._refresh_rating_if_needed(mode=mode, ranked=ranked)
+        if mode == "ROOM" and self._context.session.room is not None:
             self._context.show(ClientScreen.ROOM_LOBBY)
         else:
             self._context.show(ClientScreen.MAIN_MENU)
-        self._context.show_message(message_key)
+
+    def _refresh_rating_if_needed(self, *, mode: str, ranked: bool) -> None:
+        if mode != "PLAY" or not ranked:
+            return
+        if not self._context.session.authenticated:
+            return
+        self._context.submit(
+            self._context.messages.validate_auth(
+                self._context.session.require_auth_token()
+            ),
+            "refresh_rating",
+            show_loading=False,
+        )
 
     @staticmethod
     def _outcome_message(lifecycle_state: str, payload, own_seat: str | None) -> str:
@@ -467,19 +578,23 @@ class GameplayFlow:
             self._context.state.now_ms + self._lifecycle_poll_interval_ms
         )
 
-    def _reset_runtime_state(self) -> None:
+    def _pause_runtime(self) -> None:
         self._snapshot_pending = False
         self._lifecycle_pending = False
         self._command_pending = False
         self._reconnect_pending = False
         self._next_snapshot_poll_ms = None
         self._next_lifecycle_poll_ms = None
+        self._clear_selection()
+
+    def _reset_runtime_state(self) -> None:
+        self._pause_runtime()
         state = self._context.state
         state.game_snapshot = None
         state.game_sequence = None
         state.game_lifecycle_state = None
         state.game_reconnect_deadline_ms = None
-        self._clear_selection()
+        state.game_leave_confirm_pending = False
 
     def _stop(self) -> None:
         self._game_id = None

@@ -20,6 +20,9 @@ class Dispatcher:
     def submit(self, envelope):
         self.sent.append(envelope)
 
+    def send_immediate(self, envelope):
+        self.sent.append(envelope)
+
 
 def make_controller(*, localizer=None):
     dispatcher = Dispatcher()
@@ -475,7 +478,8 @@ def test_room_create_stores_player_session_and_polls_status():
             {"accepted": False, "code": "room_closed"},
         )
     )
-    assert controller.state.screen is ClientScreen.ROOM_LOBBY
+    assert controller.state.screen is ClientScreen.ROOM_ENTRY
+    assert controller.session.room is None
     assert controller.state.inline_message == "The room closed."
 
 
@@ -537,6 +541,33 @@ def test_room_join_error_is_localized_inside_room_entry_screen():
     assert controller.state.screen is ClientScreen.ROOM_ENTRY
     assert controller.state.inline_message == "Room not found."
     assert controller.session.room is None
+
+
+def test_stale_room_lobby_clears_when_status_reports_room_not_found():
+    controller, dispatcher = make_controller(
+        localizer=ClientLocalizer(strings={"room_not_found": "Room not found."})
+    )
+    authenticate(controller, dispatcher)
+    controller.handle_action(UiAction.ROOM)
+    controller.handle_action(UiAction.ROOM_CREATE)
+    create = dispatcher.sent[-1]
+    controller.handle_response(response(create, "room_status", room_payload()))
+    assert controller.state.screen is ClientScreen.ROOM_LOBBY
+    assert controller.session.room is not None
+
+    controller.tick(2000)
+    status = dispatcher.sent[-1]
+    controller.handle_response(
+        response(
+            status,
+            "command_result",
+            {"accepted": False, "code": "room_not_found"},
+        )
+    )
+
+    assert controller.state.screen is ClientScreen.ROOM_ENTRY
+    assert controller.session.room is None
+    assert controller.state.inline_message == "Room not found."
 
 
 def test_keyboard_focus_editing_enter_and_loading_gate():
@@ -671,6 +702,62 @@ def test_board_clicks_dispatch_move_and_jump_then_refresh_immediately():
     assert dispatcher.sent[-1] is jumped
 
 
+def test_active_game_leave_requires_confirm_before_disconnect():
+    controller, dispatcher = make_controller()
+    enter_active_play_game(controller, dispatcher)
+    sent_before = len(dispatcher.sent)
+
+    controller.handle_action(UiAction.GAME_LEAVE)
+    assert controller.state.game_leave_confirm_pending is True
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+    assert len(dispatcher.sent) == sent_before
+
+    controller.handle_action(UiAction.GAME_LEAVE_CANCEL)
+    assert controller.state.game_leave_confirm_pending is False
+
+    controller.handle_action(UiAction.GAME_LEAVE)
+    controller.handle_action(UiAction.GAME_LEAVE_CONFIRM)
+    assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.session.game is None
+    assert dispatcher.sent[-1].type == "game_resign"
+
+
+def test_ranked_game_finish_refreshes_rating():
+    controller, dispatcher = make_controller()
+    lifecycle = enter_active_play_game(controller, dispatcher)
+    controller.handle_response(
+        response(
+            lifecycle,
+            "game_forfeit",
+            {
+                "accepted": True,
+                "code": "ok",
+                "game_id": "game-1",
+                "state": "ENDED",
+                "reason": "forfeit",
+                "winner_seat": "SECOND_PLAYER",
+            },
+        )
+    )
+    refresh = dispatcher.sent[-1]
+    assert refresh.type == "validate_auth_request"
+    controller.handle_response(
+        response(
+            refresh,
+            "command_result",
+            {
+                "accepted": True,
+                "code": "ok",
+                "user_id": 7,
+                "username": "Dana",
+                "rating": 1184,
+            },
+        )
+    )
+    assert controller.session.rating == 1184
+    assert controller.state.screen is ClientScreen.GAME_BOARD
+
+
 def test_reconnect_countdown_blocks_commands_and_terminal_state_returns_to_menu():
     controller, dispatcher = make_controller()
     lifecycle = enter_active_play_game(controller, dispatcher)
@@ -714,8 +801,12 @@ def test_reconnect_countdown_blocks_commands_and_terminal_state_returns_to_menu(
         )
     )
 
-    assert controller.state.screen is ClientScreen.MAIN_MENU
+    assert controller.state.screen is ClientScreen.GAME_BOARD
     assert controller.state.inline_message == "You won the game."
+    assert controller.session.game is not None
+
+    controller.handle_action(UiAction.GAME_LEAVE)
+    assert controller.state.screen is ClientScreen.MAIN_MENU
     assert controller.session.game is None
 
 

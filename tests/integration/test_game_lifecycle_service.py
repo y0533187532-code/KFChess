@@ -191,6 +191,35 @@ def test_play_timeout_with_meaningful_activity_is_rated_forfeit(tmp_path):
     assert tuple(result) == ("BLACK_WIN", "forfeit", 1)
 
 
+def test_game_resign_immediately_forfeits_and_updates_elo(tmp_path):
+    values = system(tmp_path)
+    database, users, tokens, _, _, _, lifecycle, controls = values
+    game = active_game(values)
+    lifecycle.record_accepted_command(game["game_id"], game["first_id"])
+
+    ended = lifecycle.resign(
+        game["first_auth"], game["first_game"], game["game_id"], now_ms=3000
+    )
+
+    assert ended.state is GameLifecycleState.ENDED
+    assert ended.terminal_reason == "forfeit"
+    assert ended.winner_seat is PlayerSeat.SECOND_PLAYER
+    assert users.by_id(game["first_id"]).rating == 1184
+    assert users.by_id(game["second_id"]).rating == 1216
+    assert lifecycle.user_in_active_game(game["first_id"]) is False
+    assert lifecycle.user_in_active_game(game["second_id"]) is False
+    assert tokens.verify_game(
+        game["first_game"], game_id=game["game_id"], now_ms=3000
+    ) is None
+    assert game["game_id"] in controls.paused
+    with database.transaction() as connection:
+        result = connection.execute(
+            "SELECT outcome, reason, ranked FROM game_results WHERE game_id = ?",
+            (game["game_id"],),
+        ).fetchone()
+    assert tuple(result) == ("BLACK_WIN", "forfeit", 1)
+
+
 def test_play_timeout_without_activity_cancels_without_elo(tmp_path):
     values = system(tmp_path)
     _, users, tokens, _, _, _, lifecycle, _ = values
@@ -617,6 +646,32 @@ def test_lifecycle_status_route_emits_forfeit_winner_at_grace_deadline(tmp_path)
     assert forfeited.type == "game_forfeit"
     assert forfeited.payload["winner_seat"] == "SECOND_PLAYER"
     assert forfeited.payload["winner_color"] == "b"
+
+
+def test_game_resign_route_forfeits_immediately(tmp_path):
+    values = system(tmp_path)
+    _, users, _, _, _, _, lifecycle, _ = values
+    game = active_game(values)
+    lifecycle.record_accepted_command(game["game_id"], game["first_id"])
+    current_time = {"ms": 3000}
+    router = MessageRouter()
+    GameLifecycleHandlers(
+        lifecycle, clock_ms=lambda: current_time["ms"]
+    ).register_routes(router)
+    payload = {
+        "auth_token": game["first_auth"],
+        "game_token": game["first_game"],
+        "game_id": game["game_id"],
+    }
+
+    resigned = route(router, "game_resign", payload)
+
+    assert resigned.type == "game_forfeit"
+    assert resigned.payload["state"] == "ENDED"
+    assert resigned.payload["reason"] == "forfeit"
+    assert resigned.payload["winner_seat"] == "SECOND_PLAYER"
+    assert users.by_id(game["first_id"]).rating == 1184
+    assert lifecycle.user_in_active_game(game["first_id"]) is False
 
 
 def test_lifecycle_routes_validate_payload_and_return_structured_errors(tmp_path):

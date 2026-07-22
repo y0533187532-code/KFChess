@@ -59,6 +59,25 @@ class GameLifecycleReconnectWorkflow:
             self._context.pause_session(game_id)
             return self._context.views.create(self._context.require(game_id))
 
+    def resign(
+        self,
+        auth_token: str,
+        game_token: str,
+        game_id: str,
+        *,
+        now_ms: int,
+    ) -> GameLifecycleView:
+        with self._context.lock:
+            principal, record, player = self._context.authenticate(
+                auth_token, game_token, game_id, now_ms=now_ms
+            )
+            if record.state not in {
+                GameLifecycleState.ACTIVE.value,
+                GameLifecycleState.PAUSED_FOR_RECONNECT.value,
+            }:
+                raise GameLifecycleError(ProtocolErrorCode.INVALID_GAME_STATE)
+            return self._finalizer.forfeit(record, player, now_ms=now_ms)
+
     def disconnect_transport(
         self, game_id: str, user_id: int, *, now_ms: int
     ) -> GameLifecycleView | None:

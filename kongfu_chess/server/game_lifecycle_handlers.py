@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..protocol import MessageType, ProtocolError, ProtocolErrorCode
 from .auth_service import AuthError
 from .chess_compatibility import CHESS_SEAT_ADAPTER
+from .event_logger import ServerEventLogger
 from .game_lifecycle_models import GameLifecycleError
 from .lifecycle_messages import lifecycle_outgoing
 from .routing import OutgoingMessage
@@ -21,32 +22,48 @@ class GameLifecycleHandlers:
         seat_adapter=CHESS_SEAT_ADAPTER,
         game_connections=None,
         lifecycle_push=None,
+        events: ServerEventLogger | None = None,
     ):
         self._lifecycle = lifecycle_service
         self._clock_ms = clock_ms
         self._seat_adapter = seat_adapter
         self._game_connections = game_connections
         self._lifecycle_push = lifecycle_push
+        self._events = events or ServerEventLogger(None)
 
     def register_routes(self, router) -> None:
         router.register(MessageType.GAME_DISCONNECT.value, self.disconnect)
+        router.register(MessageType.GAME_RESIGN.value, self.resign)
         router.register(MessageType.GAME_RECONNECT.value, self.reconnect)
         router.register(MessageType.GAME_LIFECYCLE_STATUS.value, self.status)
 
     async def disconnect(self, context) -> OutgoingMessage:
         payload = self._payload(context)
-        return await self._execute(
+        outgoing = await self._execute(
             context,
             lambda now_ms: self._lifecycle.disconnect(**payload, now_ms=now_ms),
             paused_message=True,
         )
+        self._log_lifecycle_event(context, "game_disconnect", outgoing)
+        return outgoing
+
+    async def resign(self, context) -> OutgoingMessage:
+        payload = self._payload(context)
+        outgoing = await self._execute(
+            context,
+            lambda now_ms: self._lifecycle.resign(**payload, now_ms=now_ms),
+        )
+        self._log_lifecycle_event(context, "game_resign", outgoing)
+        return outgoing
 
     async def reconnect(self, context) -> OutgoingMessage:
         payload = self._payload(context)
-        return await self._execute(
+        outgoing = await self._execute(
             context,
             lambda now_ms: self._lifecycle.reconnect(**payload, now_ms=now_ms),
         )
+        self._log_lifecycle_event(context, "game_reconnect", outgoing)
+        return outgoing
 
     async def status(self, context) -> OutgoingMessage:
         payload = self._payload(context)
@@ -111,3 +128,20 @@ class GameLifecycleHandlers:
             seat_adapter=self._seat_adapter,
             paused_message=paused_message,
         )
+
+    def _log_lifecycle_event(
+        self, context, event: str, outgoing: OutgoingMessage
+    ) -> None:
+        payload = outgoing.payload
+        fields = {
+            "request_id": context.envelope.request_id,
+            "connection_id": context.connection_id,
+            "accepted": payload.get("accepted"),
+        }
+        if payload.get("code"):
+            fields["code"] = payload["code"]
+        if payload.get("game_id"):
+            fields["game_id"] = payload["game_id"]
+        if payload.get("state"):
+            fields["state"] = payload["state"]
+        self._events.event(event, **fields)

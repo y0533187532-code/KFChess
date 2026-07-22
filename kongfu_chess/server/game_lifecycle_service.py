@@ -52,6 +52,7 @@ class GameLifecycleService:
         room_repository=None,
         seat_adapter=CHESS_SEAT_ADAPTER,
         runtime_factory=None,
+        max_active_games: int | None = None,
     ):
         self._tokens = token_service
         self._lifecycles = lifecycle_repository
@@ -94,6 +95,7 @@ class GameLifecycleService:
             self._context,
             room_repository=room_repository,
             runtime_factory=runtime_factory,
+            max_active_games=max_active_games,
         )
         self._reconnect_workflow = GameLifecycleReconnectWorkflow(
             self._context, token_service, self._reconnect, self._finalizer
@@ -122,6 +124,7 @@ class GameLifecycleService:
             match_repository,
             elo_service,
             reconnect_grace_seconds=config.timing.reconnect_grace_seconds,
+            max_active_games=config.capacity.active_games,
             **overrides,
         )
 
@@ -233,6 +236,21 @@ class GameLifecycleService:
         return self._reconnect_workflow.disconnect(
             auth_token, game_token, game_id, now_ms=now_ms
         )
+
+    def resign(
+        self,
+        auth_token: str,
+        game_token: str,
+        game_id: str,
+        *,
+        now_ms: int,
+    ) -> GameLifecycleView:
+        return self._reconnect_workflow.resign(
+            auth_token, game_token, game_id, now_ms=now_ms
+        )
+
+    def set_terminal_listener(self, callback) -> None:
+        self._finalizer.on_terminal = callback
 
     def disconnect_transport(
         self, game_id: str, user_id: int, *, now_ms: int

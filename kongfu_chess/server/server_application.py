@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..infrastructure.configuration import AppConfig, ConfigProvider
+from ..infrastructure.structured_logging import configure_json_logger
 from ..persistence import (
     AuthSessionRepository,
     GameLifecycleRepository,
@@ -23,6 +25,7 @@ from .auth_handlers import AuthHandlers
 from .auth_service import AuthService
 from .connections import ConnectionRegistry
 from .elo_service import EloService
+from .event_logger import ServerEventLogger
 from .game_connection_registry import GameConnectionRegistry
 from .game_lifecycle_handlers import GameLifecycleHandlers
 from .game_lifecycle_service import GameLifecycleService
@@ -56,27 +59,46 @@ class ServerStack:
     gateway: WebSocketGateway
     router: MessageRouter
     game_connections: GameConnectionRegistry
+    connections: ConnectionRegistry
     lifecycle_push: LifecyclePushService | None = None
+    logger: logging.Logger | None = None
     _expiry_task: asyncio.Task | None = field(default=None, repr=False)
+    _backup_task: asyncio.Task | None = field(default=None, repr=False)
 
     def start_background_tasks(self) -> None:
-        if self._expiry_task is not None:
-            return
-        self._expiry_task = asyncio.create_task(
-            _run_lifecycle_expiry(self),
-            name="lifecycle-expiry",
-        )
+        if self._expiry_task is None:
+            self._expiry_task = asyncio.create_task(
+                _run_lifecycle_expiry(self),
+                name="lifecycle-expiry",
+            )
+        if self._backup_task is None:
+            self._backup_task = asyncio.create_task(
+                _run_database_backup(self),
+                name="database-backup",
+            )
 
     async def stop_background_tasks(self) -> None:
-        task = self._expiry_task
-        if task is None:
-            return
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-        self._expiry_task = None
+        for task_name in ("_expiry_task", "_backup_task"):
+            task = getattr(self, task_name)
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            setattr(self, task_name, None)
+
+
+def _configure_server_logger(config: AppConfig) -> logging.Logger:
+    return configure_json_logger(
+        "kfchess.server",
+        config.logging.server_path,
+        level=config.logging.level,
+        max_bytes=config.logging.max_bytes,
+        backup_count=config.logging.backup_count,
+        retention_days=config.logging.retention_days,
+    )
 
 
 def _open_database(config: AppConfig) -> SqliteDatabase:
@@ -127,6 +149,9 @@ def _build_repositories(database: SqliteDatabase, config: AppConfig):
 def build_server_stack(config: AppConfig) -> ServerStack:
     """Wire persistence, authoritative runtime, handlers, and the WebSocket gateway."""
 
+    logger = _configure_server_logger(config)
+    events = ServerEventLogger(logger)
+
     database = _open_database(config)
     auth, users, tokens, lifecycle_repo, match_repo, rooms_repo = _build_repositories(
         database, config
@@ -145,7 +170,9 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         clock_ms=_clock_ms,
     )
     game_connections = GameConnectionRegistry()
-    connections = ConnectionRegistry()
+    connections = ConnectionRegistry(
+        max_connections=config.capacity.websocket_connections
+    )
     router = MessageRouter()
 
     lifecycle_holder: dict[str, GameLifecycleService] = {}
@@ -162,6 +189,12 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         )
         if view is None:
             return
+        events.event(
+            "transport_disconnect",
+            game_id=binding.game_id,
+            user_id=binding.user_id,
+            state=view.state.value,
+        )
         lifecycle_push = push_holder.get("service")
         if lifecycle_push is not None:
             await lifecycle_push.notify_view(
@@ -177,6 +210,7 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         router,
         policy,
         game_connections=game_connections,
+        logger=logger,
         on_connection_closed=on_connection_closed,
     )
     push_service = SnapshotPushService(
@@ -209,6 +243,7 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         reconnect_grace_seconds=config.timing.reconnect_grace_seconds,
         runtime_factory=runtime_factory,
         room_repository=rooms_repo,
+        max_active_games=config.capacity.active_games,
     )
     runtime_factory.bind_lifecycle(lifecycle)
     lifecycle_holder["service"] = lifecycle
@@ -219,6 +254,8 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         config,
         lifecycle_service=lifecycle,
     )
+    lifecycle.set_terminal_listener(matchmaking.release_game)
+
     def snapshot_provider(game_id: str):
         engine = runtime_factory.engine_for(game_id)
         if engine is None:
@@ -241,24 +278,35 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         lifecycle_service=lifecycle,
     )
 
-    AuthHandlers(auth, clock_ms=_clock_ms).register_routes(router)
-    MatchmakingHandlers(matchmaking, clock_ms=_clock_ms).register_routes(router)
-    RoomsHandlers(rooms, clock_ms=_clock_ms).register_routes(router)
+    AuthHandlers(auth, clock_ms=_clock_ms, events=events).register_routes(router)
+    MatchmakingHandlers(
+        matchmaking, clock_ms=_clock_ms, events=events
+    ).register_routes(router)
+    RoomsHandlers(rooms, clock_ms=_clock_ms, events=events).register_routes(router)
     GameLifecycleHandlers(
         lifecycle,
         clock_ms=_clock_ms,
         game_connections=game_connections,
         lifecycle_push=lifecycle_push,
+        events=events,
     ).register_routes(router)
     GameplayHandlers(
         gameplay,
         clock_ms=_clock_ms,
         game_connections=game_connections,
+        events=events,
     ).register_routes(router)
 
     now_ms = _clock_ms()
     rooms.recover_after_restart(now_ms=now_ms)
     lifecycle.recover_after_restart(now_ms=now_ms)
+
+    events.event(
+        "server_started",
+        host=config.network.host,
+        port=config.network.port,
+        database_path=str(config.database.path),
+    )
 
     return ServerStack(
         config=config,
@@ -271,6 +319,8 @@ def build_server_stack(config: AppConfig) -> ServerStack:
         router=router,
         game_connections=game_connections,
         lifecycle_push=lifecycle_push,
+        logger=logger,
+        connections=connections,
     )
 
 
@@ -281,7 +331,37 @@ async def _run_lifecycle_expiry(stack: ServerStack) -> None:
             changed = stack.lifecycle.expire(now_ms=now_ms)
             if changed and stack.lifecycle_push is not None:
                 await stack.lifecycle_push.notify_views(changed, now_ms=now_ms)
+                events = ServerEventLogger(stack.logger)
+                for view in changed:
+                    if view.state.value in {"ENDED", "CANCELLED", "INTERRUPTED"}:
+                        events.event(
+                            "game_terminal",
+                            game_id=view.game_id,
+                            state=view.state.value,
+                            reason=view.terminal_reason,
+                        )
             await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        raise
+
+
+async def _run_database_backup(stack: ServerStack) -> None:
+    events = ServerEventLogger(stack.logger)
+    interval_seconds = stack.config.database.backup_interval_hours * 3600
+    try:
+        while True:
+            now_ms = _clock_ms()
+            try:
+                backup_path = await asyncio.to_thread(
+                    stack.database.backup_to,
+                    stack.config.database.backup_directory,
+                    timestamp_ms=now_ms,
+                )
+            except Exception as exc:
+                events.event("backup_failed", error=str(exc))
+            else:
+                events.event("backup_completed", path=str(backup_path))
+            await asyncio.sleep(interval_seconds)
     except asyncio.CancelledError:
         raise
 
@@ -301,6 +381,7 @@ async def shutdown_stack(stack: ServerStack) -> None:
     for game_id in stack.registry.game_ids():
         stack.runtime_factory.teardown(game_id)
     await stack.gateway.stop()
+    ServerEventLogger(stack.logger).event("server_stopped")
 
 
 def run_from_config(config_path: str | Path | None = None) -> None:

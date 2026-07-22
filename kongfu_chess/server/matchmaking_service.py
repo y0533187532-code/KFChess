@@ -8,6 +8,7 @@ from typing import Callable
 
 from ..protocol import ProtocolErrorCode
 from .chess_compatibility import CHESS_SEAT_ADAPTER
+from .game_lifecycle_models import GameLifecycleError
 from .game_mode import (
     PLAY_GAME_MODE,
     GameModeConfig,
@@ -253,6 +254,13 @@ class MatchmakingService:
     def match_by_id(self, game_id: str) -> PlayMatch | None:
         return self._matches_by_id.get(game_id)
 
+    def release_game(self, game_id: str) -> None:
+        match = self._matches_by_id.pop(game_id, None)
+        if match is None:
+            return
+        for seat in match.seats:
+            self._matches_by_user.pop(seat.user_id, None)
+
     def _oldest_compatible(self, rating: int) -> QueueTicket | None:
         compatible = (
             ticket
@@ -294,5 +302,11 @@ class MatchmakingService:
         for seat in match.seats:
             self._matches_by_user[seat.user_id] = match
         if self._lifecycle_service is not None:
-            self._lifecycle_service.register_play_match(match, now_ms=now_ms)
+            try:
+                self._lifecycle_service.register_play_match(match, now_ms=now_ms)
+            except GameLifecycleError as exc:
+                self._matches_by_id.pop(game_id, None)
+                for seat in match.seats:
+                    self._matches_by_user.pop(seat.user_id, None)
+                raise MatchmakingError(exc.code) from exc
         return match

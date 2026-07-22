@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Callable
+
 from .chess_compatibility import CHESS_SEAT_ADAPTER
 from .game_lifecycle_models import (
     LIVE_LIFECYCLE_STATE_VALUES,
@@ -47,6 +49,7 @@ class GameResultFinalizer:
         self._pause_session = pause_session or (lambda _game_id: None)
         self._teardown_runtime = teardown_runtime or (lambda _game_id: None)
         self._seat_adapter = seat_adapter
+        self.on_terminal: Callable[[str], None] | None = None
 
     def outcome_for_color(self, color: str) -> MatchOutcome:
         winner = self._seat_adapter.seat_for_color(color)
@@ -129,6 +132,8 @@ class GameResultFinalizer:
         self._pause_session(record.game_id)
         self._teardown_runtime(record.game_id)
         self._update_room(record, state, reason=reason, now_ms=now_ms)
+        if self.on_terminal is not None:
+            self.on_terminal(record.game_id)
         return self._views.create(self._lifecycles.by_id(record.game_id))
 
     def revoke_tokens(self, game_id: str, *, now_ms: int) -> int:
